@@ -39,14 +39,14 @@ const ACHIEVEMENTS = [
   { id:"freeze_used", emoji:"❄️",  title:"Cool Head",      desc:"Streak-Freeze eingesetzt",      check: s => s.usedFreeze },
 ];
 const INIT_TPL = [
-  { id:"t1", name:"Training",             category:"fitness",  difficulty:"hard",   frequency:"daily",  repeatable:false, emoji:"⚔️" },
-  { id:"t2", name:"Müll rausbringen",     category:"haushalt", difficulty:"easy",   frequency:"daily",  repeatable:false, emoji:"🗑️" },
-  { id:"t3", name:"Spülmaschine",         category:"haushalt", difficulty:"easy",   frequency:"daily",  repeatable:false, emoji:"🍽️" },
-  { id:"t4", name:"Waschmaschine",        category:"haushalt", difficulty:"normal", frequency:"daily",  repeatable:false, emoji:"👕" },
-  { id:"t5", name:"Kita Rucksack packen", category:"familie",  difficulty:"easy",   frequency:"daily",  repeatable:false, emoji:"🎒" },
-  { id:"t6", name:"Einkaufen",            category:"einkauf",  difficulty:"normal", frequency:"daily",  repeatable:false, emoji:"🛒" },
-  { id:"t7", name:"Wohnung aufräumen",    category:"haushalt", difficulty:"normal", frequency:"weekly", repeatable:false, emoji:"🧹" },
-  { id:"t8", name:"Wickeln",              category:"familie",  difficulty:"easy",   frequency:"daily",  repeatable:true,  emoji:"🍼" },
+  { id:"t1", name:"Training",             category:"fitness",  difficulty:"hard",   frequency:"daily",  repeatable:false, noteEnabled:false, emoji:"⚔️" },
+  { id:"t2", name:"Müll rausbringen",     category:"haushalt", difficulty:"easy",   frequency:"daily",  repeatable:false, noteEnabled:false, emoji:"🗑️" },
+  { id:"t3", name:"Spülmaschine",         category:"haushalt", difficulty:"easy",   frequency:"daily",  repeatable:false, noteEnabled:false, emoji:"🍽️" },
+  { id:"t4", name:"Waschmaschine",        category:"haushalt", difficulty:"normal", frequency:"daily",  repeatable:false, noteEnabled:false, emoji:"👕" },
+  { id:"t5", name:"Kita Rucksack packen", category:"familie",  difficulty:"easy",   frequency:"daily",  repeatable:false, noteEnabled:false, emoji:"🎒" },
+  { id:"t6", name:"Einkaufen",            category:"einkauf",  difficulty:"normal", frequency:"daily",  repeatable:false, noteEnabled:false, emoji:"🛒" },
+  { id:"t7", name:"Wohnung aufräumen",    category:"haushalt", difficulty:"normal", frequency:"weekly", repeatable:false, noteEnabled:false, emoji:"🧹" },
+  { id:"t8", name:"Wickeln",              category:"familie",  difficulty:"easy",   frequency:"daily",  repeatable:true,  noteEnabled:false, emoji:"🍼" },
 ];
 const DAYS_DE   = ["Mo","Di","Mi","Do","Fr","Sa","So"];
 const MONTHS_DE = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
@@ -82,7 +82,7 @@ function getRank(l){return RANKS.find(r=>l>=r.min&&l<=r.max)??RANKS.at(-1);}
 function sBon(s){return Math.min(s*3,30);}
 function weekDays(){const t=new Date(),o=(t.getDay()+6)%7;return Array.from({length:7},(_,i)=>{const d=new Date(t);d.setDate(t.getDate()-o+i);return ld(d);});}
 function monDays(){const t=new Date(),f=new Date(t.getFullYear(),t.getMonth(),1),la=new Date(t.getFullYear(),t.getMonth()+1,0),pad=(f.getDay()+6)%7,arr=Array(pad).fill(null);for(let d=1;d<=la.getDate();d++)arr.push(ld(new Date(t.getFullYear(),t.getMonth(),d)));return arr;}
-function migTpl(arr){return arr.map(t=>({repeatable:false,...t,frequency:t.frequency??(t.recurring?"daily":"daily")}));}
+function migTpl(arr){return arr.map(t=>({repeatable:false,...t,frequency:t.frequency??(t.recurring?"daily":"daily"),noteEnabled:t.noteEnabled??false}));}
 function mkPlayer(p={}){return{name:"Tim",streak:0,lastDate:null,completedOnce:[],weeklyGoal:500,freezes:1,lastFreezeMonth:null,achievements:[],usedFreeze:false,...p};}
 
 function computeStats(comps, player, level) {
@@ -109,7 +109,7 @@ export default function App() {
   const [noteText, setNoteText] = useState("");
   const [editGoal, setEditGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
-  const [newQ, setNewQ] = useState({name:"",category:"sonstige",difficulty:"normal",emoji:"📋",frequency:"daily",repeatable:false});
+  const [newQ, setNewQ] = useState({name:"",category:"sonstige",difficulty:"normal",emoji:"📋",frequency:"daily",repeatable:false,noteEnabled:false});
   const noteTimer = useRef(null);
 
   // Persist
@@ -182,10 +182,9 @@ export default function App() {
     if(np.lastDate!==today){s=(np.lastDate===yest||!np.lastDate)?s+1:1;}
     np={...np,streak:s,lastDate:today};
     setFlash({xp:earned,key:Date.now()});
-    // Note prompt
+    // Note prompt only if template has noteEnabled
     clearTimeout(noteTimer.current);
-    setPendingNote({compId:id}); setNoteText("");
-    noteTimer.current=setTimeout(()=>setPendingNote(null),8000);
+    if(t.noteEnabled){ setPendingNote({compId:id}); setNoteText(""); noteTimer.current=setTimeout(()=>setPendingNote(null),8000); }
     afterComplete(nc,np);
   }
 
@@ -216,7 +215,7 @@ export default function App() {
     if(!newQ.name.trim())return;
     const id="t"+Date.now(),t={...newQ,id,name:newQ.name.trim()};
     const nt=[...tpl,t]; setTpl(nt); saveAll(nt,comps,plr);
-    setNewQ({name:"",category:"sonstige",difficulty:"normal",emoji:"📋",frequency:"daily",repeatable:false});
+    setNewQ({name:"",category:"sonstige",difficulty:"normal",emoji:"📋",frequency:"daily",repeatable:false,noteEnabled:false});
     setShowAdd(false);
   }
   function doDelete(id){const nt=tpl.filter(t=>t.id!==id);setTpl(nt);saveAll(nt,comps,plr);}
@@ -399,7 +398,7 @@ export default function App() {
           </div>
         </div>
         <div style={{display:"flex",marginTop:14}}>
-          {[{id:"today",l:"TODAY",i:"⚔️"},{id:"week",l:"WOCHE",i:"📅"},{id:"month",l:"MONAT",i:"📆"},{id:"quests",l:"QUESTS",i:"📋"}].map(({id,l,i})=>(
+          {[{id:"today",l:"TODAY",i:"⚔️"},{id:"week",l:"WOCHE",i:"📅"},{id:"month",l:"MONAT",i:"📆"},{id:"quests",l:"QUESTS",i:"📋"},{id:"profil",l:"PROFIL",i:"🏆"}].map(({id,l,i})=>(
             <button key={id} className="tab-btn" onClick={()=>setTab(id)} style={{flex:1,padding:"10px 0 8px",border:"none",background:"transparent",borderBottom:`2px solid ${tab===id?"#38bdf8":"transparent"}`,color:tab===id?"#38bdf8":"#2d3f55",fontSize:9,fontWeight:700,letterSpacing:1,fontFamily:"'Rajdhani',sans-serif",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
               <span style={{fontSize:15}}>{i}</span>{l}
             </button>
@@ -538,37 +537,6 @@ export default function App() {
         {/* ═══ QUESTS ══════════════════════════════════════════════════════════ */}
         {tab==="quests"&&<>
 
-          {/* Achievements */}
-          <div style={{marginBottom:24}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-              <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#fbbf24",letterSpacing:2}}>ACHIEVEMENTS</div>
-              <div style={{fontSize:11,color:"#2d3f55"}}>{(plr.achievements||[]).length}/{ACHIEVEMENTS.length} freigeschaltet</div>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-              {ACHIEVEMENTS.map(a=>{const done=(plr.achievements||[]).includes(a.id);return(
-                <div key={a.id} style={{background:done?"rgba(251,191,36,.06)":"rgba(255,255,255,.02)",border:`1px solid ${done?"rgba(251,191,36,.3)":"#1a2840"}`,borderRadius:12,padding:"10px 8px",textAlign:"center",opacity:done?1:.45}}>
-                  <div style={{fontSize:22}}>{a.emoji}</div>
-                  <div style={{fontSize:10,fontWeight:700,color:done?"#fbbf24":"#475569",marginTop:4,lineHeight:1.2}}>{a.title}</div>
-                  <div style={{fontSize:8,color:"#334155",marginTop:3,lineHeight:1.3}}>{a.desc}</div>
-                </div>
-              );})}
-            </div>
-          </div>
-          <HR/>
-
-          {/* Export / Import */}
-          <div style={{marginBottom:20}}>
-            <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#38bdf8",letterSpacing:2,marginBottom:10}}>DATEN</div>
-            <div style={{display:"flex",gap:10}}>
-              <button onClick={doExport} style={{flex:1,padding:"12px",borderRadius:11,border:"1px solid rgba(56,189,248,.4)",background:"rgba(56,189,248,.08)",color:"#38bdf8",fontFamily:"'Rajdhani',sans-serif",fontWeight:700,fontSize:13}}>⬇ Export JSON</button>
-              <label style={{flex:1,padding:"12px",borderRadius:11,border:"1px solid rgba(192,132,252,.4)",background:"rgba(192,132,252,.08)",color:"#c084fc",fontFamily:"'Rajdhani',sans-serif",fontWeight:700,fontSize:13,textAlign:"center",cursor:"pointer"}}>
-                ⬆ Import JSON
-                <input type="file" accept=".json" onChange={doImport} style={{display:"none"}}/>
-              </label>
-            </div>
-          </div>
-          <HR/>
-
           {/* Templates */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
             <div>
@@ -581,7 +549,7 @@ export default function App() {
           {dailyQ.length>0&&<>
             <div style={{fontSize:9,color:"#38bdf8",letterSpacing:2,fontWeight:700,marginBottom:10,fontFamily:"'Orbitron',monospace"}}>⚔️ DAILY</div>
             {dailyQ.map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(
-              <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} extra={t.repeatable&&<Tag color="#fbbf24" label="🔁 REPEAT"/>}/>
+              <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} extra={<>{t.repeatable&&<Tag color="#fbbf24" label="🔁 REPEAT"/>}{t.noteEnabled&&<Tag color="#38bdf8" label="💬 NOTIZ"/>}</>}/>
             );})}
           </>}
           {weeklyQ.length>0&&<>
@@ -599,6 +567,50 @@ export default function App() {
           {tpl.length===0&&<div style={{textAlign:"center",padding:44,color:"#1a2840",fontFamily:"'Orbitron',monospace",fontSize:11,letterSpacing:2}}>NO TEMPLATES</div>}
         </>}
       </div>
+
+
+        {/* ═══ PROFIL ══════════════════════════════════════════════════════════ */}
+        {tab==="profil"&&<>
+          {/* Achievements */}
+          <div style={{marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+              <div>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#fbbf24",letterSpacing:2}}>ACHIEVEMENTS</div>
+                <div style={{fontSize:11,color:"#2d3f55",marginTop:3}}>{(plr.achievements||[]).length} / {ACHIEVEMENTS.length} freigeschaltet</div>
+              </div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:24}}>
+              {ACHIEVEMENTS.map(a=>{const done=(plr.achievements||[]).includes(a.id);return(
+                <div key={a.id} style={{background:done?"rgba(251,191,36,.06)":"rgba(255,255,255,.02)",border:`1px solid ${done?"rgba(251,191,36,.35)":"#1a2840"}`,borderRadius:12,padding:"12px 8px",textAlign:"center",opacity:done?1:.38,transition:"opacity .3s"}}>
+                  <div style={{fontSize:26}}>{a.emoji}</div>
+                  <div style={{fontSize:10,fontWeight:700,color:done?"#fbbf24":"#475569",marginTop:5,lineHeight:1.2}}>{a.title}</div>
+                  <div style={{fontSize:8,color:"#334155",marginTop:3,lineHeight:1.3}}>{a.desc}</div>
+                  {done&&<div style={{fontSize:8,color:"rgba(251,191,36,.5)",marginTop:4,letterSpacing:1}}>✓ UNLOCKED</div>}
+                </div>
+              );})}
+            </div>
+          </div>
+
+          <HR/>
+
+          {/* Export / Import */}
+          <div style={{marginBottom:8}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#38bdf8",letterSpacing:2,marginBottom:12}}>DATEN</div>
+            <div style={{background:"rgba(15,20,40,.8)",border:"1px solid #1a2840",borderRadius:14,padding:"16px",marginBottom:10}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#e2e8f0",marginBottom:4}}>Backup exportieren</div>
+              <div style={{fontSize:11,color:"#475569",marginBottom:12}}>Alle Quests, Completions und Stats als JSON speichern.</div>
+              <button onClick={doExport} style={{width:"100%",padding:"12px",borderRadius:11,border:"1px solid rgba(56,189,248,.4)",background:"rgba(56,189,248,.08)",color:"#38bdf8",fontFamily:"'Rajdhani',sans-serif",fontWeight:700,fontSize:13}}>⬇ Export JSON</button>
+            </div>
+            <div style={{background:"rgba(15,20,40,.8)",border:"1px solid #1a2840",borderRadius:14,padding:"16px"}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#e2e8f0",marginBottom:4}}>Backup importieren</div>
+              <div style={{fontSize:11,color:"#475569",marginBottom:12}}>JSON-Datei laden und alle Daten wiederherstellen.</div>
+              <label style={{display:"block",width:"100%",padding:"12px",borderRadius:11,border:"1px solid rgba(192,132,252,.4)",background:"rgba(192,132,252,.08)",color:"#c084fc",fontFamily:"'Rajdhani',sans-serif",fontWeight:700,fontSize:13,textAlign:"center",cursor:"pointer",boxSizing:"border-box"}}>
+                ⬆ Import JSON
+                <input type="file" accept=".json" onChange={doImport} style={{display:"none"}}/>
+              </label>
+            </div>
+          </div>
+        </>}
 
       {/* ADD MODAL */}
       {showAdd&&<div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.88)",backdropFilter:"blur(12px)",display:"flex",alignItems:"flex-end"}} onClick={e=>{if(e.target===e.currentTarget)setShowAdd(false)}}>
@@ -634,6 +646,17 @@ export default function App() {
               <div style={{width:20,height:20,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:newQ.repeatable?25:4,transition:"left .2s",boxShadow:"0 1px 4px rgba(0,0,0,.3)"}}/>
             </div>
           </div>}
+          {/* Note toggle */}
+          <div style={{marginBottom:14,background:"rgba(56,189,248,.04)",border:"1px solid rgba(56,189,248,.15)",borderRadius:11,padding:"11px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:"#94a3b8"}}>💬 Kommentarfunktion</div>
+              <div style={{fontSize:11,color:"#3a4f6a",marginTop:1}}>Notiz-Eingabe nach Erledigung</div>
+            </div>
+            <div onClick={()=>setNewQ(q=>({...q,noteEnabled:!q.noteEnabled}))} style={{width:48,height:28,borderRadius:14,cursor:"pointer",background:newQ.noteEnabled?"#38bdf8":"#111929",border:`1px solid ${newQ.noteEnabled?"#38bdf8":"#1e2f48"}`,position:"relative",transition:"background .2s",flexShrink:0}}>
+              <div style={{width:20,height:20,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:newQ.noteEnabled?25:4,transition:"left .2s",boxShadow:"0 1px 4px rgba(0,0,0,.3)"}}/>
+            </div>
+          </div>
+
           <div style={{marginBottom:14}}>
             <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>KATEGORIE</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
