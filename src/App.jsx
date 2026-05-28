@@ -105,6 +105,7 @@ export default function App() {
   const [achFlash, setAchFlash] = useState(null);   // achievement unlock
   const [showAdd,   setShowAdd]   = useState(false);
   const [showFreeze,setShowFreeze]= useState(false); // freeze prompt
+  const [editingTpl, setEditingTpl] = useState(null);   // null=new, template=editing
   const [pendingNote, setPendingNote] = useState(null); // {compId}
   const [noteText, setNoteText] = useState("");
   const [editGoal, setEditGoal] = useState(false);
@@ -220,6 +221,11 @@ export default function App() {
   }
   function doDelete(id){const nt=tpl.filter(t=>t.id!==id);setTpl(nt);saveAll(nt,comps,plr);}
 
+  function openNew() {
+    setEditingTpl(null);
+    setNewQ({name:"",category:"sonstige",difficulty:"normal",emoji:"📋",frequency:"daily",repeatable:false,noteEnabled:false});
+    setShowAdd(true);
+  }
   function openEdit(t) {
     setEditingTpl(t);
     setNewQ({name:t.name,category:t.category,difficulty:t.difficulty,emoji:t.emoji,frequency:t.frequency,repeatable:t.repeatable||false,noteEnabled:t.noteEnabled||false});
@@ -433,12 +439,12 @@ export default function App() {
             <div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:700,color:"#38bdf8",letterSpacing:2,marginTop:5}}>ALL QUESTS COMPLETE!</div>
           </div>}
           {weeklyQ.length>0&&<>
-            <SecHead label="WEEKLY CHALLENGES" color="#c084fc" count={`${weeklyDone}/${weeklyQ.length}`} sub={`Reset ${(()=>{const t=new Date(),o=(t.getDay()+6)%7,m=new Date(t);m.setDate(t.getDate()-o+7);return m.toLocaleDateString("de-DE",{weekday:"short",day:"numeric",month:"short"});})()}`} onAdd={()=>setShowAdd(true)} btnColor="#c084fc"/>
+            <SecHead label="WEEKLY CHALLENGES" color="#c084fc" count={`${weeklyDone}/${weeklyQ.length}`} sub={`Reset ${(()=>{const t=new Date(),o=(t.getDay()+6)%7,m=new Date(t);m.setDate(t.getDate()-o+7);return m.toLocaleDateString("de-DE",{weekday:"short",day:"numeric",month:"short"});})()}`} onAdd={openNew} btnColor="#c084fc"/>
             {weeklyQ.map(t=><NormalRow key={t.id} t={t} done={wkDoneIds.has(t.id)} onToggle={()=>wkDoneIds.has(t.id)?doUndo(t.id,true):doComplete(t)} isWeekly/>)}
             <HR/>
           </>}
           {onceActive.length>0&&<>
-            <SecHead label="EINMALIG" color="#fb923c" count={`${onceDone}/${onceQ.length}`} sub="einmalig erledigen" onAdd={()=>setShowAdd(true)} btnColor="#fb923c"/>
+            <SecHead label="EINMALIG" color="#fb923c" count={`${onceDone}/${onceQ.length}`} sub="einmalig erledigen" onAdd={openNew} btnColor="#fb923c"/>
             {onceActive.map(t=><OnceRow key={t.id} t={t}/>)}
             <HR/>
           </>}
@@ -450,7 +456,7 @@ export default function App() {
               </div>
               <div style={{fontSize:11,color:"#2d3f55",marginTop:2}}>{new Date().toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long"})}</div>
             </div>
-            <button onClick={()=>setShowAdd(true)} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ QUEST</button>
+            <button onClick={openNew} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ QUEST</button>
           </div>
           {dailyQ.length===0?<EmptyState/>:dailyQ.map(t=>t.repeatable?<RepeatRow key={t.id} t={t}/>:<NormalRow key={t.id} t={t} done={doneIds.has(t.id)} onToggle={()=>doneIds.has(t.id)?doUndo(t.id):doComplete(t)}/>)}
         </>}
@@ -553,7 +559,7 @@ export default function App() {
               <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#38bdf8",letterSpacing:2}}>TEMPLATES</div>
               <div style={{fontSize:11,color:"#2d3f55",marginTop:3}}>{dailyQ.length} daily · {weeklyQ.length} weekly · {onceQ.length} einmalig</div>
             </div>
-            <button onClick={()=>setShowAdd(true)} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ NEW</button>
+            <button onClick={openNew} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ NEW</button>
           </div>
 
           {dailyQ.length>0&&<>
