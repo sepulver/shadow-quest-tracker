@@ -105,7 +105,8 @@ export default function App() {
   const [achFlash, setAchFlash] = useState(null);   // achievement unlock
   const [showAdd,   setShowAdd]   = useState(false);
   const [showFreeze,setShowFreeze]= useState(false); // freeze prompt
-  const [editingTpl, setEditingTpl] = useState(null);   // null=new, template=editing
+  const [isEditing,  setIsEditing]   = useState(false); // true when editing existing template
+  const editingRef = useRef(null);                        // holds template being edited
   const [pendingNote, setPendingNote] = useState(null); // {compId}
   const [noteText, setNoteText] = useState("");
   const [editGoal, setEditGoal] = useState(false);
@@ -214,25 +215,34 @@ export default function App() {
 
   function doAdd(){
     if(!newQ.name.trim())return;
-    const id="t"+Date.now(),t={...newQ,id,name:newQ.name.trim()};
-    const nt=[...tpl,t]; setTpl(nt); saveAll(nt,comps,plr);
-    setNewQ({name:"",category:"sonstige",difficulty:"normal",emoji:"📋",frequency:"daily",repeatable:false,noteEnabled:false});
-    setShowAdd(false);
+    const editing = editingRef.current;
+    if(editing){
+      const nt=tpl.map(t=>t.id===editing.id ? {...t,...newQ,id:t.id,name:newQ.name.trim()} : t);
+      setTpl(nt); saveAll(nt,comps,plr);
+    } else {
+      const id="t"+Date.now(),t={...newQ,id,name:newQ.name.trim()};
+      const nt=[...tpl,t]; setTpl(nt); saveAll(nt,comps,plr);
+    }
+    closeModal();
   }
   function doDelete(id){const nt=tpl.filter(t=>t.id!==id);setTpl(nt);saveAll(nt,comps,plr);}
 
   function openNew() {
-    setEditingTpl(null);
+    editingRef.current = null;
+    setIsEditing(false);
     setNewQ({name:"",category:"sonstige",difficulty:"normal",emoji:"📋",frequency:"daily",repeatable:false,noteEnabled:false});
     setShowAdd(true);
   }
   function openEdit(t) {
-    setEditingTpl(t);
+    editingRef.current = t;
+    setIsEditing(true);
     setNewQ({name:t.name,category:t.category,difficulty:t.difficulty,emoji:t.emoji,frequency:t.frequency,repeatable:t.repeatable||false,noteEnabled:t.noteEnabled||false});
     setShowAdd(true);
   }
   function closeModal() {
-    setShowAdd(false); setEditingTpl(null);
+    editingRef.current = null;
+    setIsEditing(false);
+    setShowAdd(false);
     setNewQ({name:"",category:"sonstige",difficulty:"normal",emoji:"📋",frequency:"daily",repeatable:false,noteEnabled:false});
   }
 
@@ -632,7 +642,7 @@ export default function App() {
       {showAdd&&<div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.88)",backdropFilter:"blur(12px)",display:"flex",alignItems:"flex-end"}} onClick={e=>{if(e.target===e.currentTarget)closeModal()}}>
         <div className="modal-sheet" style={{width:"100%",maxWidth:480,margin:"0 auto",background:"#080d1c",borderRadius:"24px 24px 0 0",border:"1px solid #1a2840",borderBottom:"none",padding:"24px 18px 48px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
-            <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,color:"#38bdf8",letterSpacing:2}}>ADD QUEST</div>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,color:"#38bdf8",letterSpacing:2}}>{isEditing?"EDIT QUEST":"ADD QUEST"}</div>
             <button onClick={closeModal} style={{background:"none",border:"none",color:"#475569",fontSize:22,padding:"0 4px",lineHeight:1}}>✕</button>
           </div>
           <div style={{marginBottom:16}}>
@@ -694,9 +704,9 @@ export default function App() {
             </div>
           </div>
           <button onClick={doAdd} disabled={!newQ.name.trim()} style={{width:"100%",padding:"16px",borderRadius:13,border:"none",background:newQ.name.trim()?"linear-gradient(135deg,#1d4ed8,#38bdf8)":"#111929",color:newQ.name.trim()?"#fff":"#2d3f55",fontFamily:"'Orbitron',monospace",fontSize:13,fontWeight:700,letterSpacing:2,boxShadow:newQ.name.trim()?"0 4px 24px rgba(56,189,248,.25)":"none",transition:"all .2s"}}>
-            {editingTpl?"ÄNDERUNGEN SPEICHERN":"QUEST HINZUFÜGEN"}
+            {isEditing?"ÄNDERUNGEN SPEICHERN":"QUEST HINZUFÜGEN"}
           </button>
-          {editingTpl&&<button onClick={()=>{doDelete(editingTpl.id);closeModal();}} style={{width:"100%",marginTop:12,padding:"14px",borderRadius:13,border:"1px solid rgba(248,113,113,.35)",background:"rgba(248,113,113,.07)",color:"#f87171",fontFamily:"'Rajdhani',sans-serif",fontSize:14,fontWeight:700,letterSpacing:1}}>
+          {isEditing&&<button onClick={()=>{doDelete(editingRef.current.id);closeModal();}} style={{width:"100%",marginTop:12,padding:"14px",borderRadius:13,border:"1px solid rgba(248,113,113,.35)",background:"rgba(248,113,113,.07)",color:"#f87171",fontFamily:"'Rajdhani',sans-serif",fontSize:14,fontWeight:700,letterSpacing:1}}>
             🗑 Quest löschen
           </button>}
         </div>
