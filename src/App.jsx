@@ -220,6 +220,16 @@ export default function App() {
   }
   function doDelete(id){const nt=tpl.filter(t=>t.id!==id);setTpl(nt);saveAll(nt,comps,plr);}
 
+  function openEdit(t) {
+    setEditingTpl(t);
+    setNewQ({name:t.name,category:t.category,difficulty:t.difficulty,emoji:t.emoji,frequency:t.frequency,repeatable:t.repeatable||false,noteEnabled:t.noteEnabled||false});
+    setShowAdd(true);
+  }
+  function closeModal() {
+    setShowAdd(false); setEditingTpl(null);
+    setNewQ({name:"",category:"sonstige",difficulty:"normal",emoji:"📋",frequency:"daily",repeatable:false,noteEnabled:false});
+  }
+
   function doExport(){
     const data=JSON.stringify({templates:tpl,completions:comps,player:plr},null,2);
     const blob=new Blob([data],{type:"application/json"});
@@ -549,19 +559,19 @@ export default function App() {
           {dailyQ.length>0&&<>
             <div style={{fontSize:9,color:"#38bdf8",letterSpacing:2,fontWeight:700,marginBottom:10,fontFamily:"'Orbitron',monospace"}}>⚔️ DAILY</div>
             {dailyQ.map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(
-              <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} extra={<>{t.repeatable&&<Tag color="#fbbf24" label="🔁 REPEAT"/>}{t.noteEnabled&&<Tag color="#38bdf8" label="💬 NOTIZ"/>}</>}/>
+              <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} extra={<>{t.repeatable&&<Tag color="#fbbf24" label="🔁 REPEAT"/>}{t.noteEnabled&&<Tag color="#38bdf8" label="💬 NOTIZ"/>}</>} onEdit={()=>openEdit(t)}/>
             );})}
           </>}
           {weeklyQ.length>0&&<>
             <div style={{fontSize:9,color:"#c084fc",letterSpacing:2,fontWeight:700,margin:"16px 0 10px",fontFamily:"'Orbitron',monospace"}}>📅 WEEKLY</div>
-            {weeklyQ.map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(<TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)}/>);})}
+            {weeklyQ.map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(<TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} onEdit={()=>openEdit(t)}/>);})}
           </>}
           {onceQ.length>0&&<>
             <div style={{fontSize:9,color:"#fb923c",letterSpacing:2,fontWeight:700,margin:"16px 0 10px",fontFamily:"'Orbitron',monospace"}}>✅ EINMALIG</div>
             {onceQ.map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,done=(plr.completedOnce||[]).includes(t.id);return(
               <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} done={done}
                 extra={<Tag color={done?"#4ade80":"#fb923c"} label={done?"✓ ERLEDIGT":"1× EINMALIG"}/>}
-                onReset={done?()=>doResetOnce(t.id):null}/>
+                onReset={done?()=>doResetOnce(t.id):null} onEdit={()=>openEdit(t)}/>
             );})}
           </>}
           {tpl.length===0&&<div style={{textAlign:"center",padding:44,color:"#1a2840",fontFamily:"'Orbitron',monospace",fontSize:11,letterSpacing:2}}>NO TEMPLATES</div>}
@@ -613,11 +623,11 @@ export default function App() {
         </>}
 
       {/* ADD MODAL */}
-      {showAdd&&<div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.88)",backdropFilter:"blur(12px)",display:"flex",alignItems:"flex-end"}} onClick={e=>{if(e.target===e.currentTarget)setShowAdd(false)}}>
+      {showAdd&&<div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.88)",backdropFilter:"blur(12px)",display:"flex",alignItems:"flex-end"}} onClick={e=>{if(e.target===e.currentTarget)closeModal()}}>
         <div className="modal-sheet" style={{width:"100%",maxWidth:480,margin:"0 auto",background:"#080d1c",borderRadius:"24px 24px 0 0",border:"1px solid #1a2840",borderBottom:"none",padding:"24px 18px 48px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
             <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,color:"#38bdf8",letterSpacing:2}}>ADD QUEST</div>
-            <button onClick={()=>setShowAdd(false)} style={{background:"none",border:"none",color:"#475569",fontSize:22,padding:"0 4px",lineHeight:1}}>✕</button>
+            <button onClick={closeModal} style={{background:"none",border:"none",color:"#475569",fontSize:22,padding:"0 4px",lineHeight:1}}>✕</button>
           </div>
           <div style={{marginBottom:16}}>
             <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:6,fontWeight:700}}>QUEST NAME</div>
@@ -678,7 +688,7 @@ export default function App() {
             </div>
           </div>
           <button onClick={doAdd} disabled={!newQ.name.trim()} style={{width:"100%",padding:"16px",borderRadius:13,border:"none",background:newQ.name.trim()?"linear-gradient(135deg,#1d4ed8,#38bdf8)":"#111929",color:newQ.name.trim()?"#fff":"#2d3f55",fontFamily:"'Orbitron',monospace",fontSize:13,fontWeight:700,letterSpacing:2,boxShadow:newQ.name.trim()?"0 4px 24px rgba(56,189,248,.25)":"none",transition:"all .2s"}}>
-            QUEST HINZUFÜGEN
+            {editingTpl?"ÄNDERUNGEN SPEICHERN":"QUEST HINZUFÜGEN"}
           </button>
         </div>
       </div>}
@@ -696,10 +706,10 @@ function SecHead({label,color,count,sub,onAdd,btnColor}){return<div style={{disp
 </div>;}
 function HR(){return<div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(56,189,248,.12),transparent)",margin:"6px 0 18px"}}/>;}
 function EmptyState(){return<div style={{textAlign:"center",padding:"40px 20px"}}><div style={{fontSize:40}}>⚔️</div><div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#1a2540",marginTop:12,letterSpacing:2}}>NO ACTIVE QUESTS</div></div>;}
-function TplRow({t,d,cat,onDelete,done=false,extra,onReset}){return(
+function TplRow({t,d,cat,onDelete,done=false,extra,onReset,onEdit}){return(
   <div style={{background:"rgba(12,18,40,.9)",border:`1px solid ${done?"rgba(74,222,128,.15)":"#1a2840"}`,borderRadius:13,padding:"13px 15px",marginBottom:10,display:"flex",alignItems:"center",gap:12,opacity:done?.65:1}}>
-    <div style={{fontSize:22}}>{t.emoji}</div>
-    <div style={{flex:1}}>
+    <div className="tap" onClick={onEdit} style={{fontSize:22,minWidth:36,textAlign:"center",cursor:"pointer"}}>{t.emoji}</div>
+    <div className="tap" onClick={onEdit} style={{flex:1,cursor:"pointer"}}>
       <div style={{fontWeight:700,fontSize:15,color:done?"#475569":"#e2e8f0",textDecoration:done?"line-through":"none"}}>{t.name}</div>
       <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
         <Tag color={cat.color} label={cat.label.toUpperCase()}/>
@@ -708,8 +718,9 @@ function TplRow({t,d,cat,onDelete,done=false,extra,onReset}){return(
       </div>
     </div>
     <div style={{display:"flex",gap:6}}>
-      {onReset&&<button onClick={onReset} style={{background:"rgba(56,189,248,.1)",border:"1px solid rgba(56,189,248,.3)",color:"#38bdf8",borderRadius:9,padding:"8px 10px",fontSize:12,flexShrink:0}}>↺</button>}
-      <button onClick={onDelete} style={{background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",color:"#f87171",borderRadius:9,padding:"9px 11px",fontSize:14,flexShrink:0}}>🗑</button>
+      {onReset&&<button onClick={e=>{e.stopPropagation();onReset();}} style={{background:"rgba(56,189,248,.1)",border:"1px solid rgba(56,189,248,.3)",color:"#38bdf8",borderRadius:9,padding:"8px 10px",fontSize:12,flexShrink:0}}>↺</button>}
+      <button onClick={e=>{e.stopPropagation();onEdit&&onEdit();}} style={{background:"rgba(56,189,248,.06)",border:"1px solid rgba(56,189,248,.25)",color:"#38bdf8",borderRadius:9,padding:"9px 11px",fontSize:13,flexShrink:0}}>✏️</button>
+      <button onClick={e=>{e.stopPropagation();onDelete();}} style={{background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",color:"#f87171",borderRadius:9,padding:"9px 11px",fontSize:14,flexShrink:0}}>🗑</button>
     </div>
   </div>
 );}
