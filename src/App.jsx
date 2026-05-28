@@ -643,7 +643,6 @@ export default function App() {
         <div className="modal-sheet" style={{width:"100%",maxWidth:480,margin:"0 auto",background:"#080d1c",borderRadius:"24px 24px 0 0",border:"1px solid #1a2840",borderBottom:"none",padding:"24px 18px 48px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
             <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,color:"#38bdf8",letterSpacing:2}}>{isEditing?"EDIT QUEST":"ADD QUEST"}</div>
-            <button onClick={closeModal} style={{background:"none",border:"none",color:"#475569",fontSize:22,padding:"0 4px",lineHeight:1}}>✕</button>
           </div>
           <div style={{marginBottom:16}}>
             <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:6,fontWeight:700}}>QUEST NAME</div>
@@ -706,7 +705,10 @@ export default function App() {
           <button onClick={doAdd} disabled={!newQ.name.trim()} style={{width:"100%",padding:"16px",borderRadius:13,border:"none",background:newQ.name.trim()?"linear-gradient(135deg,#1d4ed8,#38bdf8)":"#111929",color:newQ.name.trim()?"#fff":"#2d3f55",fontFamily:"'Orbitron',monospace",fontSize:13,fontWeight:700,letterSpacing:2,boxShadow:newQ.name.trim()?"0 4px 24px rgba(56,189,248,.25)":"none",transition:"all .2s"}}>
             {isEditing?"ÄNDERUNGEN SPEICHERN":"QUEST HINZUFÜGEN"}
           </button>
-          {isEditing&&<button onClick={()=>{doDelete(editingRef.current.id);closeModal();}} style={{width:"100%",marginTop:12,padding:"14px",borderRadius:13,border:"1px solid rgba(248,113,113,.35)",background:"rgba(248,113,113,.07)",color:"#f87171",fontFamily:"'Rajdhani',sans-serif",fontSize:14,fontWeight:700,letterSpacing:1}}>
+          <button onClick={closeModal} style={{width:"100%",marginTop:10,padding:"14px",borderRadius:13,border:"1px solid #1e2f48",background:"transparent",color:"#64748b",fontFamily:"'Rajdhani',sans-serif",fontSize:14,fontWeight:700,letterSpacing:1}}>
+            Abbrechen
+          </button>
+          {isEditing&&<button onClick={()=>{doDelete(editingRef.current.id);closeModal();}} style={{width:"100%",marginTop:10,padding:"14px",borderRadius:13,border:"1px solid rgba(248,113,113,.35)",background:"rgba(248,113,113,.07)",color:"#f87171",fontFamily:"'Rajdhani',sans-serif",fontSize:14,fontWeight:700,letterSpacing:1}}>
             🗑 Quest löschen
           </button>}
         </div>
