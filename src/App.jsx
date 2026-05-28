@@ -559,17 +559,17 @@ export default function App() {
           {dailyQ.length>0&&<>
             <div style={{fontSize:9,color:"#38bdf8",letterSpacing:2,fontWeight:700,marginBottom:10,fontFamily:"'Orbitron',monospace"}}>⚔️ DAILY</div>
             {dailyQ.map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(
-              <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} extra={<>{t.repeatable&&<Tag color="#fbbf24" label="🔁 REPEAT"/>}{t.noteEnabled&&<Tag color="#38bdf8" label="💬 NOTIZ"/>}</>} onEdit={()=>openEdit(t)}/>
+              <TplRow key={t.id} t={t} d={d} cat={cat} extra={<>{t.repeatable&&<Tag color="#fbbf24" label="🔁 REPEAT"/>}{t.noteEnabled&&<Tag color="#38bdf8" label="💬 NOTIZ"/>}</>} onEdit={()=>openEdit(t)}/>
             );})}
           </>}
           {weeklyQ.length>0&&<>
             <div style={{fontSize:9,color:"#c084fc",letterSpacing:2,fontWeight:700,margin:"16px 0 10px",fontFamily:"'Orbitron',monospace"}}>📅 WEEKLY</div>
-            {weeklyQ.map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(<TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} onEdit={()=>openEdit(t)}/>);})}
+            {weeklyQ.map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(<TplRow key={t.id} t={t} d={d} cat={cat} onEdit={()=>openEdit(t)}/>);})}
           </>}
           {onceQ.length>0&&<>
             <div style={{fontSize:9,color:"#fb923c",letterSpacing:2,fontWeight:700,margin:"16px 0 10px",fontFamily:"'Orbitron',monospace"}}>✅ EINMALIG</div>
             {onceQ.map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,done=(plr.completedOnce||[]).includes(t.id);return(
-              <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} done={done}
+              <TplRow key={t.id} t={t} d={d} cat={cat} done={done}
                 extra={<Tag color={done?"#4ade80":"#fb923c"} label={done?"✓ ERLEDIGT":"1× EINMALIG"}/>}
                 onReset={done?()=>doResetOnce(t.id):null} onEdit={()=>openEdit(t)}/>
             );})}
@@ -690,6 +690,9 @@ export default function App() {
           <button onClick={doAdd} disabled={!newQ.name.trim()} style={{width:"100%",padding:"16px",borderRadius:13,border:"none",background:newQ.name.trim()?"linear-gradient(135deg,#1d4ed8,#38bdf8)":"#111929",color:newQ.name.trim()?"#fff":"#2d3f55",fontFamily:"'Orbitron',monospace",fontSize:13,fontWeight:700,letterSpacing:2,boxShadow:newQ.name.trim()?"0 4px 24px rgba(56,189,248,.25)":"none",transition:"all .2s"}}>
             {editingTpl?"ÄNDERUNGEN SPEICHERN":"QUEST HINZUFÜGEN"}
           </button>
+          {editingTpl&&<button onClick={()=>{doDelete(editingTpl.id);closeModal();}} style={{width:"100%",marginTop:12,padding:"14px",borderRadius:13,border:"1px solid rgba(248,113,113,.35)",background:"rgba(248,113,113,.07)",color:"#f87171",fontFamily:"'Rajdhani',sans-serif",fontSize:14,fontWeight:700,letterSpacing:1}}>
+            🗑 Quest löschen
+          </button>}
         </div>
       </div>}
     </div>
@@ -706,10 +709,10 @@ function SecHead({label,color,count,sub,onAdd,btnColor}){return<div style={{disp
 </div>;}
 function HR(){return<div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(56,189,248,.12),transparent)",margin:"6px 0 18px"}}/>;}
 function EmptyState(){return<div style={{textAlign:"center",padding:"40px 20px"}}><div style={{fontSize:40}}>⚔️</div><div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#1a2540",marginTop:12,letterSpacing:2}}>NO ACTIVE QUESTS</div></div>;}
-function TplRow({t,d,cat,onDelete,done=false,extra,onReset,onEdit}){return(
-  <div style={{background:"rgba(12,18,40,.9)",border:`1px solid ${done?"rgba(74,222,128,.15)":"#1a2840"}`,borderRadius:13,padding:"13px 15px",marginBottom:10,display:"flex",alignItems:"center",gap:12,opacity:done?.65:1}}>
-    <div className="tap" onClick={onEdit} style={{fontSize:22,minWidth:36,textAlign:"center",cursor:"pointer"}}>{t.emoji}</div>
-    <div className="tap" onClick={onEdit} style={{flex:1,cursor:"pointer"}}>
+function TplRow({t,d,cat,done=false,extra,onReset,onEdit}){return(
+  <div className="tap" onClick={onEdit} style={{background:"rgba(12,18,40,.9)",border:`1px solid ${done?"rgba(74,222,128,.15)":"#1a2840"}`,borderRadius:13,padding:"13px 15px",marginBottom:10,display:"flex",alignItems:"center",gap:12,opacity:done?.65:1,cursor:"pointer"}}>
+    <div style={{fontSize:22,minWidth:36,textAlign:"center"}}>{t.emoji}</div>
+    <div style={{flex:1,minWidth:0}}>
       <div style={{fontWeight:700,fontSize:15,color:done?"#475569":"#e2e8f0",textDecoration:done?"line-through":"none"}}>{t.name}</div>
       <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
         <Tag color={cat.color} label={cat.label.toUpperCase()}/>
@@ -717,10 +720,9 @@ function TplRow({t,d,cat,onDelete,done=false,extra,onReset,onEdit}){return(
         {extra}
       </div>
     </div>
-    <div style={{display:"flex",gap:6}}>
+    <div style={{display:"flex",alignItems:"center",gap:8}}>
       {onReset&&<button onClick={e=>{e.stopPropagation();onReset();}} style={{background:"rgba(56,189,248,.1)",border:"1px solid rgba(56,189,248,.3)",color:"#38bdf8",borderRadius:9,padding:"8px 10px",fontSize:12,flexShrink:0}}>↺</button>}
-      <button onClick={e=>{e.stopPropagation();onEdit&&onEdit();}} style={{background:"rgba(56,189,248,.06)",border:"1px solid rgba(56,189,248,.25)",color:"#38bdf8",borderRadius:9,padding:"9px 11px",fontSize:13,flexShrink:0}}>✏️</button>
-      <button onClick={e=>{e.stopPropagation();onDelete();}} style={{background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",color:"#f87171",borderRadius:9,padding:"9px 11px",fontSize:14,flexShrink:0}}>🗑</button>
+      <div style={{color:"#2d3f55",fontSize:16}}>›</div>
     </div>
   </div>
 );}
