@@ -229,8 +229,8 @@ export default function App() {
   const doneIds    =useMemo(()=>new Set(todayC.map(c=>c.templateId)),[todayC]);
   const wkDoneIds  =useMemo(()=>new Set(weekC.map(c=>c.templateId)),[weekC]);
   const repCnt     =useMemo(()=>{const m={};todayC.forEach(c=>{m[c.templateId]=(m[c.templateId]||0)+1;});return m;},[todayC]);
-  const dailyDone  =dailyQ.filter(q=>!q.repeatable&&doneIds.has(q.id)).length;
-  const dailyTotal =dailyQ.filter(q=>!q.repeatable).length;
+  const dailyDone  =dailyQ.filter(q=>q.repeatable?(repCnt[q.id]||0)>0:doneIds.has(q.id)).length;
+  const dailyTotal =dailyQ.length;
   const weeklyDone =weeklyQ.filter(q=>wkDoneIds.has(q.id)).length;
   const onceDone   =onceQ.length-onceActive.length;
   const totalDone  =dailyDone+weeklyDone+onceDone;
@@ -397,14 +397,16 @@ export default function App() {
 
   function RepeatRow({t}){
     const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,count=repCnt[t.id]||0,earned=(d.xp+bon)*(dblXp?2:1);
+    const qStreak=questStreak(comps,t.id,today);
     return(<div style={{background:"rgba(12,18,40,.95)",border:`1px solid ${d.color}38`,borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12,boxShadow:`0 2px 16px ${d.color}12`}}>
       <div style={{fontSize:25,minWidth:40,textAlign:"center"}}>{t.emoji}</div>
       <div style={{flex:1,minWidth:0}}>
         <div style={{fontWeight:700,fontSize:16,color:"#e2e8f0"}}>{t.name}</div>
-        <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap",alignItems:"center"}}>
           <Tag color={cat.color} label={cat.label.toUpperCase()}/>
           <Tag color={d.color} label={d.label.toUpperCase()}/>
           <Tag color="#fbbf24" label="🔁 REPEAT"/>
+          {qStreak>=2&&<span style={{fontSize:10,color:"#fbbf24",fontWeight:700}}>🔥{qStreak}</span>}
         </div>
       </div>
       <div style={{display:"flex",alignItems:"center",gap:8}}>
