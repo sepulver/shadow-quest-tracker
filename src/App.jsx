@@ -85,7 +85,7 @@ const INIT_TPL = [
 ];
 const DAYS_DE   = ["Mo","Di","Mi","Do","Fr","Sa","So"];
 const MONTHS_DE = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
-const STORE_KEY = "sqt"; // permanent — never change this
+const STORE_KEY = "sqt"; // permanent - never change this
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 function loadAll() {
@@ -119,7 +119,7 @@ function weekDays(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7,mon=new Da
 function weekStartFromOffset(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7,mon=new Date(t);mon.setDate(t.getDate()-o+weekOffset*7);return ld(mon);}
 function monDays(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);const year=ref.getFullYear(),month=ref.getMonth(),f=new Date(year,month,1),la=new Date(year,month+1,0),pad=(f.getDay()+6)%7,arr=Array(pad).fill(null);for(let d=1;d<=la.getDate();d++)arr.push(ld(new Date(year,month,d)));return arr;}
 function monLabel(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);return{month:ref.getMonth(),year:ref.getFullYear()};}
-function weekLabel(weekOffset=0){const days=weekDays(weekOffset);const start=new Date(days[0]+"T12:00"),end=new Date(days[6]+"T12:00");const fmt=d=>d.toLocaleDateString("de-DE",{day:"numeric",month:"short"});const d=new Date(days[0]+"T12:00");d.setHours(0,0,0,0);d.setDate(d.getDate()+4-(d.getDay()||7));const kw=Math.ceil((((d-new Date(d.getFullYear(),0,1))/86400000)+1)/7);return{label:`KW ${kw}: ${fmt(start)} – ${fmt(end)}`,kw};}
+function weekLabel(weekOffset=0){const days=weekDays(weekOffset);const start=new Date(days[0]+"T12:00"),end=new Date(days[6]+"T12:00");const fmt=d=>d.toLocaleDateString("de-DE",{day:"numeric",month:"short"});const d=new Date(days[0]+"T12:00");d.setHours(0,0,0,0);d.setDate(d.getDate()+4-(d.getDay()||7));const kw=Math.ceil((((d-new Date(d.getFullYear(),0,1))/86400000)+1)/7);return{label:`KW ${kw}: ${fmt(start)} - ${fmt(end)}`,kw};}
 function migTpl(arr){return arr.map(t=>({repeatable:false,...t,frequency:t.frequency??(t.recurring?"daily":"daily")}));}
 function mkPlayer(p={}){const base={name:"Tim",streak:0,lastDate:null,completedOnce:[],weeklyGoal:500,freezes:1,lastFreezeMonth:null,achievements:[],usedFreeze:false,...p};base.achievements=migAchs(base.achievements);return base;}
 
@@ -365,7 +365,7 @@ export default function App() {
       <div style={{display:"flex",alignItems:"center",gap:8}}>
         <button onClick={e=>{e.stopPropagation();doUndo(t.id);}} disabled={count===0} style={{width:32,height:32,borderRadius:"50%",border:`1.5px solid ${count>0?"#475569":"#1a2540"}`,background:"transparent",color:count>0?"#94a3b8":"#2d3f55",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>−</button>
         <div style={{minWidth:44,textAlign:"center"}}>
-          <div style={{fontFamily:"'Orbitron',monospace",fontSize:22,fontWeight:900,color:count>0?d.color:"#2d3f55",lineHeight:1}}>×{count}</div>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:22,fontWeight:900,color:count>0?d.color:"#2d3f55",lineHeight:1}}>x{count}</div>
           {count>0&&<div style={{fontSize:9,color:"#3a4f6a",marginTop:2}}>{count*earned} XP</div>}
         </div>
         <button className="tap" onClick={e=>{e.stopPropagation();doComplete(t);}} style={{width:38,height:38,borderRadius:"50%",border:`2px solid ${d.color}`,background:d.color+"20",color:d.color,fontSize:22,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>+</button>
@@ -382,7 +382,7 @@ export default function App() {
         <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
           <Tag color={cat.color} label={cat.label.toUpperCase()}/>
           <Tag color={d.color} label={d.label.toUpperCase()}/>
-          <Tag color="#fb923c" label="1× EINMALIG"/>
+          <Tag color="#fb923c" label="1x EINMALIG"/>
         </div>
       </div>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,minWidth:52}}>
@@ -554,14 +554,14 @@ export default function App() {
         {tab==="week"&&<>
           {/* Week navigation */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-            <button onClick={()=>setWeekOffset(o=>o-1)} style={{background:"rgba(56,189,248,.08)",border:"1px solid rgba(56,189,248,.2)",color:"#38bdf8",borderRadius:9,padding:"7px 13px",fontSize:16,lineHeight:1}}>‹</button>
+            <button onClick={()=>setWeekOffset(o=>o-1)} style={{background:"rgba(56,189,248,.08)",border:"1px solid rgba(56,189,248,.2)",color:"#38bdf8",borderRadius:9,padding:"7px 13px",fontSize:16,lineHeight:1}}><</button>
             <div style={{textAlign:"center",flex:1,padding:"0 8px"}}>
               {weekOffset===0
                 ?<div style={{fontFamily:"'Orbitron',monospace",fontSize:10,color:"#38bdf8",letterSpacing:2}}>AKTUELLE WOCHE</div>
                 :<div style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#64748b",letterSpacing:1}}>{wkLabel.label}</div>
               }
             </div>
-            <button onClick={()=>setWeekOffset(o=>o+1)} disabled={weekOffset>=0} style={{background:weekOffset>=0?"transparent":"rgba(56,189,248,.08)",border:`1px solid ${weekOffset>=0?"#0d1628":"rgba(56,189,248,.2)"}`,color:weekOffset>=0?"#1a2840":"#38bdf8",borderRadius:9,padding:"7px 13px",fontSize:16,lineHeight:1,cursor:weekOffset>=0?"default":"pointer"}}>›</button>
+            <button onClick={()=>setWeekOffset(o=>o+1)} disabled={weekOffset>=0} style={{background:weekOffset>=0?"transparent":"rgba(56,189,248,.08)",border:`1px solid ${weekOffset>=0?"#0d1628":"rgba(56,189,248,.2)"}`,color:weekOffset>=0?"#1a2840":"#38bdf8",borderRadius:9,padding:"7px 13px",fontSize:16,lineHeight:1,cursor:weekOffset>=0?"default":"pointer"}}>></button>
           </div>
 
           {/* Wochenziel */}
@@ -622,12 +622,12 @@ export default function App() {
         {tab==="month"&&<>
           {/* Month navigation */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-            <button onClick={()=>setMonthOffset(o=>o-1)} style={{background:"rgba(56,189,248,.08)",border:"1px solid rgba(56,189,248,.2)",color:"#38bdf8",borderRadius:9,padding:"7px 13px",fontSize:16,lineHeight:1}}>‹</button>
+            <button onClick={()=>setMonthOffset(o=>o-1)} style={{background:"rgba(56,189,248,.08)",border:"1px solid rgba(56,189,248,.2)",color:"#38bdf8",borderRadius:9,padding:"7px 13px",fontSize:16,lineHeight:1}}><</button>
             <div style={{textAlign:"center",flex:1,padding:"0 8px"}}>
               <div style={{fontFamily:"'Orbitron',monospace",fontSize:monthOffset===0?11:10,color:monthOffset===0?"#38bdf8":"#64748b",letterSpacing:2}}>{MONTHS_DE[mLabel.month].toUpperCase()} {mLabel.year}</div>
               {monthOffset===0&&<div style={{fontSize:9,color:"#2d3f55",letterSpacing:1,marginTop:2}}>AKTUELLER MONAT</div>}
             </div>
-            <button onClick={()=>setMonthOffset(o=>o+1)} disabled={monthOffset>=0} style={{background:monthOffset>=0?"transparent":"rgba(56,189,248,.08)",border:`1px solid ${monthOffset>=0?"#0d1628":"rgba(56,189,248,.2)"}`,color:monthOffset>=0?"#1a2840":"#38bdf8",borderRadius:9,padding:"7px 13px",fontSize:16,lineHeight:1,cursor:monthOffset>=0?"default":"pointer"}}>›</button>
+            <button onClick={()=>setMonthOffset(o=>o+1)} disabled={monthOffset>=0} style={{background:monthOffset>=0?"transparent":"rgba(56,189,248,.08)",border:`1px solid ${monthOffset>=0?"#0d1628":"rgba(56,189,248,.2)"}`,color:monthOffset>=0?"#1a2840":"#38bdf8",borderRadius:9,padding:"7px 13px",fontSize:16,lineHeight:1,cursor:monthOffset>=0?"default":"pointer"}}>></button>
           </div>
           <div style={{display:"flex",gap:8,marginBottom:18}}>
             {[{v:monXP.toLocaleString(),l:"XP MONAT",c:"#38bdf8"},{v:monCnt,l:"QUESTS",c:"#c084fc"},{v:actDays,l:"AKTIV TAGE",c:"#4ade80"}].map(({v,l,c})=>(
@@ -683,7 +683,7 @@ export default function App() {
             <div style={{fontSize:9,color:"#fb923c",letterSpacing:2,fontWeight:700,margin:"16px 0 10px",fontFamily:"'Orbitron',monospace"}}>✅ EINMALIG</div>
             {(tplSort==="alpha"?[...onceQ].sort((a,b)=>a.name.localeCompare(b.name)):onceQ).map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,done=(plr.completedOnce||[]).includes(t.id);return(
               <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} onEdit={()=>openEdit(t)} done={done}
-                extra={<Tag color={done?"#4ade80":"#fb923c"} label={done?"✓ ERLEDIGT":"1× EINMALIG"}/>}
+                extra={<Tag color={done?"#4ade80":"#fb923c"} label={done?"✓ ERLEDIGT":"1x EINMALIG"}/>}
                 onReset={done?()=>doResetOnce(t.id):null}/>
             );})}
           </>}
@@ -928,7 +928,7 @@ function TplRow({t,d,cat,onDelete,onEdit,done=false,extra,onReset}){return(
             <div style={{fontSize:9,color:"#fb923c",letterSpacing:2,fontWeight:700,margin:"16px 0 10px",fontFamily:"'Orbitron',monospace"}}>✅ EINMALIG</div>
             {onceQ.map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,done=(plr.completedOnce||[]).includes(t.id);return(
               <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} done={done}
-                extra={<Tag color={done?"#4ade80":"#fb923c"} label={done?"✓ ERLEDIGT":"1× EINMALIG"}/>}
+                extra={<Tag color={done?"#4ade80":"#fb923c"} label={done?"✓ ERLEDIGT":"1x EINMALIG"}/>}
                 onReset={done?()=>doResetOnce(t.id):null}/>
             );})}
           </>}
