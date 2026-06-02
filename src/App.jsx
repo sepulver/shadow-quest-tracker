@@ -23,7 +23,7 @@ const RANKS = [
   { rank:"SS",  title:"Transcendent Hunter",    min:150, max:199, color:"#fb923c" },
   { rank:"SSS", title:"Ruler of the Shadows",   min:200, max:299, color:"#e879f9" },
   { rank:"NL",  title:"National Level Hunter",  min:300, max:499, color:"#67e8f9" },
-  { rank:"SМ",  title:"Shadow Monarch",         min:500, max:99999,    color:"#fde68a" },
+  { rank:"SM",  title:"Shadow Monarch",         min:500, max:99999,    color:"#fde68a" },
 ];
 // Tiered achievements: levels array = [bronze, silver, gold] thresholds
 // Single-level achievements have no levels array
@@ -112,7 +112,7 @@ function ld(d=new Date()){return`${d.getFullYear()}-${String(d.getMonth()+1).pad
 const TODAY=()=>ld();
 const MONTH=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`};
 function wkStart(){const t=new Date(),o=(t.getDay()+6)%7,m=new Date(t);m.setDate(t.getDate()-o);return ld(m);}
-function lvlInfo(xp){let l=1,u=0;while(true){const n=l*100;if(u+n>xp)break;u+=n;l++;}const i=xp-u,f=l*100;return{level:l,inLvl:i,forNext:f,pct:Math.min(100,(i/f)*100)};}
+function lvlInfo(xp){let l=1,u=0;while(l<9999){const n=l*100;if(u+n>xp)break;u+=n;l++;}const i=xp-u,f=l*100;return{level:l,inLvl:i,forNext:f,pct:Math.min(100,(i/f)*100)};}
 function getRank(l){return RANKS.find(r=>l>=r.min&&l<=r.max)??RANKS[RANKS.length-1];}
 function sBon(s){return Math.min(s*3,30);}
 function weekDays(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7,mon=new Date(t);mon.setDate(t.getDate()-o+weekOffset*7);return Array.from({length:7},(_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return ld(d);});}
