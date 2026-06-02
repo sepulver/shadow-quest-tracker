@@ -539,22 +539,35 @@ export default function App() {
             </div>
           </div>
           {reorderMode&&<div style={{fontSize:10,color:"#334155",textAlign:"center",marginBottom:10,letterSpacing:.5}}>Quests per Drag & Drop sortieren</div>}
-          {dailyQ.length===0?<EmptyState/>:dailyQ.filter(t=>t.frequency==="daily").map((t,i)=>(
-            <div key={t.id}
-              draggable={reorderMode}
-              onDragStart={reorderMode?()=>onDragStart(i):undefined}
-              onDragEnter={reorderMode?()=>onDragEnter(i):undefined}
-              onDragEnd={reorderMode?onDragEnd:undefined}
-              onDragOver={reorderMode?e=>e.preventDefault():undefined}
-              style={{position:"relative",transition:"background .15s",borderRadius:14,background:reorderMode?"rgba(56,189,248,.03)":"transparent"}}>
-              {reorderMode&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:32,display:"flex",alignItems:"center",justifyContent:"center",zIndex:10,cursor:"grab"}}>
-                <div style={{display:"flex",flexDirection:"column",gap:4}}>{[0,1,2].map(j=><div key={j} style={{width:16,height:2,background:"#38bdf8",borderRadius:1,opacity:.5}}/>)}</div>
-              </div>}
-              <div style={{paddingLeft:reorderMode?32:0}}>
-                {t.repeatable?<RepeatRow t={t}/>:<NormalRow t={t} done={doneIds.has(t.id)} onToggle={()=>!reorderMode&&(doneIds.has(t.id)?doUndo(t.id):doComplete(t))}/>}
+          {dailyQ.length===0?<EmptyState/>:(()=>{
+            const displayList = dragOrder
+              ? dragOrder.map(id=>tpl.find(t=>t.id===id)).filter(Boolean)
+              : dailyQ.filter(t=>t.frequency==="daily");
+            return(
+              <div ref={touchListRef}>
+                {displayList.map((t,i)=>(
+                  <div key={t.id}
+                    onTouchStart={e=>onTouchStartRow(e,i)}
+                    onTouchMove={onTouchMoveRow}
+                    onTouchEnd={onTouchEndRow}
+                    style={{position:"relative",borderRadius:14,
+                      background:reorderMode?"rgba(56,189,248,.04)":"transparent",
+                      border:reorderMode?"1px solid rgba(56,189,248,.12)":"1px solid transparent",
+                      marginBottom:reorderMode?6:0,
+                      touchAction:reorderMode?"none":"auto"}}>
+                    {reorderMode&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:36,display:"flex",alignItems:"center",justifyContent:"center",zIndex:10}}>
+                      <div style={{display:"flex",flexDirection:"column",gap:4,pointerEvents:"none"}}>
+                        {[0,1,2].map(j=><div key={j} style={{width:18,height:2,background:"#38bdf8",borderRadius:1,opacity:.6}}/>)}
+                      </div>
+                    </div>}
+                    <div style={{paddingLeft:reorderMode?36:0}}>
+                      {t.repeatable?<RepeatRow t={t}/>:<NormalRow t={t} done={doneIds.has(t.id)} onToggle={()=>!reorderMode&&(doneIds.has(t.id)?doUndo(t.id):doComplete(t))}/>}
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          ))}
+            );
+          })()}
         </>}
 
         {/* ═══ WEEK ════════════════════════════════════════════════════════════ */}
