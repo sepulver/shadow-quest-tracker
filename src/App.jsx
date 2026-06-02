@@ -909,7 +909,7 @@ function TplRow({t,d,cat,onDelete,onEdit,done=false,extra,onReset}){return(
     </div>
   </div>
 );}            <div style={{display:"flex",gap:7}}>
-              <button onClick={()=>setTplSort(s=>s==="alpha"?"manual":"alpha")} style={{background:tplSort==="alpha"?"rgba(56,189,248,.15)":"rgba(71,85,105,.1)",border:`1px solid ${tplSort==="alpha"?"rgba(56,189,248,.5)":"rgba(71,85,105,.3)"}`,color:tplSort==="alpha"?"#38bdf8":"#64748b",borderRadius:9,padding:"8px 10px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:.5}}>A–Z</button>
+              <button onClick={()=>setTplSort(s=>s==="alpha"?"manual":"alpha")} style={{background:tplSort==="alpha"?"rgba(56,189,248,.15)":"rgba(71,85,105,.1)",border:`1px solid ${tplSort==="alpha"?"rgba(56,189,248,.5)":"rgba(71,85,105,.3)"}`,color:tplSort==="alpha"?"#38bdf8":"#64748b",borderRadius:9,padding:"8px 10px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:.5}}>A-Z</button>
               <button onClick={openAdd} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ NEW</button>
             </div>
           </div>
