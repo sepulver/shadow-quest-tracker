@@ -115,6 +115,12 @@ function wkStart(){const t=new Date(),o=(t.getDay()+6)%7,m=new Date(t);m.setDate
 function lvlInfo(xp){let l=1,u=0;while(l<9999){const n=l*100;if(u+n>xp)break;u+=n;l++;}const i=xp-u,f=l*100;return{level:l,inLvl:i,forNext:f,pct:Math.min(100,(i/f)*100)};}
 function getRank(l){return RANKS.find(r=>l>=r.min&&l<=r.max)??RANKS.at(-1);}
 function sBon(s){return Math.min(s*3,30);}
+// Deterministic daily random: hash date string to 0-99, Double XP if < 20 (20% chance)
+function isDblXpDay(dateStr){
+  let h=0;
+  for(let i=0;i<dateStr.length;i++){h=(h*31+dateStr.charCodeAt(i))>>>0;}
+  return (h%5)===0;
+}
 function weekDays(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7,mon=new Date(t);mon.setDate(t.getDate()-o+weekOffset*7);return Array.from({length:7},(_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return ld(d);});}
 function weekStartFromOffset(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7,mon=new Date(t);mon.setDate(t.getDate()-o+weekOffset*7);return ld(mon);}
 function monDays(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);const year=ref.getFullYear(),month=ref.getMonth(),f=new Date(year,month,1),la=new Date(year,month+1,0),pad=(f.getDay()+6)%7,arr=Array(pad).fill(null);for(let d=1;d<=la.getDate();d++)arr.push(ld(new Date(year,month,d)));return arr;}
@@ -123,6 +129,21 @@ function weekLabel(weekOffset=0){const days=weekDays(weekOffset);const start=new
 function migTpl(arr){return arr.map(t=>({repeatable:false,...t,frequency:t.frequency??(t.recurring?"daily":"daily")}));}
 function mkPlayer(p={}){const base={name:"Tim",streak:0,lastDate:null,completedOnce:[],weeklyGoal:500,freezes:1,lastFreezeMonth:null,achievements:[],usedFreeze:false,...p};base.achievements=migAchs(base.achievements);return base;}
 
+// Returns consecutive days streak for a specific template up to (not including) today
+function questStreak(comps, templateId, today) {
+  const days = new Set(comps.filter(c=>c.templateId===templateId).map(c=>c.date));
+  let streak = 0;
+  let d = new Date(today + 'T12:00');
+  d.setDate(d.getDate() - 1); // start from yesterday
+  while(true) {
+    const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    if(!days.has(key)) break;
+    streak++;
+    d.setDate(d.getDate() - 1);
+    if(streak > 365) break; // safety
+  }
+  return streak;
+}
 function computeStats(comps, player, level) {
   const cat={};
   comps.forEach(c=>{cat[c.category]=(cat[c.category]||0)+1;});
@@ -200,6 +221,7 @@ export default function App() {
   const todayXP    =useMemo(()=>todayC.reduce((s,c)=>s+c.earnedXp,0),[todayC]);
   const weekXP     =useMemo(()=>weekC.reduce((s,c)=>s+c.earnedXp,0),[weekC]);
   const bon        =sBon(plr.streak);
+  const dblXp      =isDblXpDay(today);
   const dailyQ     =useMemo(()=>tpl.filter(t=>t.frequency==="daily"),[tpl]);
   const weeklyQ    =useMemo(()=>tpl.filter(t=>t.frequency==="weekly"),[tpl]);
   const onceQ      =useMemo(()=>tpl.filter(t=>t.frequency==="once"),[tpl]);
@@ -246,7 +268,7 @@ export default function App() {
   }
 
   function doComplete(t) {
-    const base=DIFF[t.difficulty].xp, earned=base+bon;
+    const base=DIFF[t.difficulty].xp, earned=(base+bon)*(dblXp?2:1);
     const id=Date.now()+"";
     const nc=[...comps,{id,templateId:t.id,name:t.name,category:t.category,difficulty:t.difficulty,emoji:t.emoji,frequency:t.frequency,repeatable:t.repeatable||false,baseXp:base,streakBonus:bon,earnedXp:earned,date:today,weekStart:ws,ts:Date.now(),note:""}];
     let np={...plr};
@@ -353,26 +375,28 @@ export default function App() {
 
   // ── Sub-Components ───────────────────────────────────────────────────────────
   function NormalRow({t,done,onToggle,isWeekly=false}){
-    const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,earned=d.xp+bon;
+    const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,earned=(d.xp+bon)*(dblXp?2:1);
+    const qStreak=questStreak(comps,t.id,today);
     return(<div className="tap" onClick={onToggle} style={{background:done?"rgba(12,17,30,.5)":"rgba(12,18,40,.95)",border:`1px solid ${done?"#0d1628":d.color+"38"}`,borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12,opacity:done?.48:1,boxShadow:done?"none":`0 2px 16px ${d.color}12`,transition:"all .18s"}}>
       <div style={{fontSize:25,minWidth:40,textAlign:"center"}}>{t.emoji}</div>
       <div style={{flex:1,minWidth:0}}>
         <div style={{fontWeight:700,fontSize:16,color:done?"#2d3f55":"#e2e8f0",textDecoration:done?"line-through":"none"}}>{t.name}</div>
-        <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap",alignItems:"center"}}>
           <Tag color={(CATS[t.category]??CATS.sonstige).color} label={(CATS[t.category]??CATS.sonstige).label.toUpperCase()}/>
           <Tag color={d.color} label={d.label.toUpperCase()}/>
           {isWeekly&&<Tag color="#c084fc" label="📅 WEEKLY"/>}
+          {qStreak>=2&&!done&&<span style={{fontSize:10,color:"#fbbf24",fontWeight:700}}>🔥{qStreak}</span>}
         </div>
       </div>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,minWidth:52}}>
-        <XPLabel earned={earned} bon={bon} done={done} color={d.color}/>
+        <XPLabel earned={earned} bon={bon} done={done} color={d.color} dbl={dblXp}/>
         <Circle done={done} color={d.color}/>
       </div>
     </div>);
   }
 
   function RepeatRow({t}){
-    const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,count=repCnt[t.id]||0,earned=d.xp+bon;
+    const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,count=repCnt[t.id]||0,earned=(d.xp+bon)*(dblXp?2:1);
     return(<div style={{background:"rgba(12,18,40,.95)",border:`1px solid ${d.color}38`,borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12,boxShadow:`0 2px 16px ${d.color}12`}}>
       <div style={{fontSize:25,minWidth:40,textAlign:"center"}}>{t.emoji}</div>
       <div style={{flex:1,minWidth:0}}>
@@ -395,7 +419,7 @@ export default function App() {
   }
 
   function OnceRow({t}){
-    const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,earned=d.xp+bon;
+    const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,earned=(d.xp+bon)*(dblXp?2:1);
     return(<div className="tap" onClick={()=>doComplete(t)} style={{background:"rgba(12,18,40,.95)",border:`1px solid ${d.color}38`,borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12,boxShadow:`0 2px 16px ${d.color}12`}}>
       <div style={{fontSize:25,minWidth:40,textAlign:"center"}}>{t.emoji}</div>
       <div style={{flex:1,minWidth:0}}>
@@ -491,6 +515,11 @@ export default function App() {
               <span style={{fontFamily:"'Orbitron',monospace",fontSize:15,fontWeight:700,color:"#fbbf24",lineHeight:1}}>{plr.streak}</span>
               <span style={{fontSize:8,color:"#78350f",letterSpacing:1,fontWeight:700}}>STREAK</span>
             </div>
+            {dblXp&&<div style={{background:"rgba(250,204,21,.12)",border:"1px solid rgba(250,204,21,.4)",borderRadius:12,padding:"8px 10px",display:"flex",flexDirection:"column",alignItems:"center",gap:2,animation:"glow 1.5s ease infinite"}}>
+              <span style={{fontSize:15}}>⚡</span>
+              <span style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#fde047",lineHeight:1}}>x2</span>
+              <span style={{fontSize:8,color:"#713f12",letterSpacing:1,fontWeight:700}}>XP</span>
+            </div>}
           </div>
         </div>
         <div style={{marginBottom:4}}>
@@ -515,6 +544,13 @@ export default function App() {
 
         {/* ═══ TODAY ═══════════════════════════════════════════════════════════ */}
         {tab==="today"&&<>
+          {dblXp&&<div style={{background:"linear-gradient(135deg,rgba(250,204,21,.12),rgba(250,204,21,.06))",border:"1px solid rgba(250,204,21,.35)",borderRadius:14,padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:12,animation:"slideUp .4s ease"}}>
+            <span style={{fontSize:22}}>⚡</span>
+            <div>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:700,color:"#fde047",letterSpacing:2}}>DOUBLE XP EVENT</div>
+              <div style={{fontSize:11,color:"#a16207",marginTop:2}}>Heute bekommst du doppelte XP!</div>
+            </div>
+          </div>}
           <div style={{display:"flex",gap:8,marginBottom:18}}>
             {[{v:todayXP,l:"XP HEUTE",c:"#38bdf8"},{v:totalDone,l:"ERLEDIGT",c:"#c084fc"},{v:progress+"%",l:"PROGRESS",c:"#4ade80"}].map(({v,l,c})=>(
               <div key={l} style={{flex:1,background:`${c}09`,border:`1px solid ${c}28`,borderRadius:12,padding:"12px 6px",textAlign:"center"}}>
@@ -910,7 +946,7 @@ export default function App() {
 
 // ─── Micro Components ─────────────────────────────────────────────────────────
 function Tag({color,label}){return<span style={{fontSize:9,padding:"2px 7px",borderRadius:20,fontWeight:700,letterSpacing:.5,color,background:color+"15"}}>{label}</span>;}
-function XPLabel({earned,bon,done,color}){return<><div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:700,color:done?"#2d3f55":color}}>+{earned}<span style={{fontSize:8}}>XP</span></div>{bon>0&&!done&&<div style={{fontSize:9,color:"#fbbf24"}}>🔥+{bon}</div>}</>;}
+function XPLabel({earned,bon,done,color,dbl}){return<><div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:700,color:done?"#2d3f55":color}}>+{earned}<span style={{fontSize:8}}>XP</span></div>{bon>0&&!done&&<div style={{fontSize:9,color:"#fbbf24"}}>🔥+{bon}</div>}{dbl&&!done&&<div style={{fontSize:9,color:"#fde047"}}>⚡x2</div>}</>;}
 function Circle({done,color}){return<div style={{width:30,height:30,borderRadius:"50%",border:`2px solid ${done?"#1a2540":color+"55"}`,background:done?color+"22":"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s"}}>{done&&<span style={{color,fontSize:15,fontWeight:700}}>✓</span>}</div>;}
 function SecHead({label,color,count,sub,onAdd,btnColor}){return<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
   <div><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color,letterSpacing:2}}>{label}</div><div style={{fontSize:9,color,background:color+"20",border:`1px solid ${color}50`,borderRadius:20,padding:"2px 8px",fontWeight:700}}>{count}</div></div><div style={{fontSize:11,color:"#2d3f55",marginTop:2}}>{sub}</div></div>
