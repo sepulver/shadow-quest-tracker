@@ -168,7 +168,10 @@ export default function App() {
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(null);
   const [reorderMode, setReorderMode] = useState(false);
-
+  const [tplSort,     setTplSort]     = useState('manual');
+  const [editingId,   setEditingId]   = useState(null);
+  const dragIdx = useRef(null);
+  const dragOver = useRef(null);
   const noteTimer = useRef(null);
 
   // Persist
@@ -282,24 +285,42 @@ export default function App() {
   }
   function doBreakStreak(){const np={...plr,streak:0};setPlr(np);saveAll(tpl,comps,np);setShowFreeze(false);}
 
-  function doAdd(){
+  function openAdd(){
+    setEditingId(null);
+    setNewQ({name:'',category:'sonstige',difficulty:'normal',emoji:'📋',frequency:'daily',repeatable:false});
+    setShowAdd(true);
+  }
+  function openEdit(t){
+    setEditingId(t.id);
+    setNewQ({name:t.name,category:t.category,difficulty:t.difficulty,emoji:t.emoji,frequency:t.frequency,repeatable:t.repeatable||false});
+    setShowAdd(true);
+  }
+  function doSaveQuest(){
     if(!newQ.name.trim())return;
-    const id="t"+Date.now(),t={...newQ,id,name:newQ.name.trim()};
-    const nt=[...tpl,t]; setTpl(nt); saveAll(nt,comps,plr);
-    setNewQ({name:"",category:"sonstige",difficulty:"normal",emoji:"📋",frequency:"daily",repeatable:false});
-    setShowAdd(false);
+    if(editingId){
+      const nt=tpl.map(t=>t.id===editingId?{...t,...newQ,name:newQ.name.trim()}:t);
+      setTpl(nt); saveAll(nt,comps,plr);
+    } else {
+      const id='t'+Date.now(),t={...newQ,id,name:newQ.name.trim()};
+      const nt=[...tpl,t]; setTpl(nt); saveAll(nt,comps,plr);
+    }
+    setNewQ({name:'',category:'sonstige',difficulty:'normal',emoji:'📋',frequency:'daily',repeatable:false});
+    setEditingId(null); setShowAdd(false);
   }
   function doDelete(id){const nt=tpl.filter(t=>t.id!==id);setTpl(nt);saveAll(nt,comps,plr);}
 
-  function moveQuest(i, dir) {
-    const daily = tpl.filter(t=>t.frequency==="daily");
-    const rest  = tpl.filter(t=>t.frequency!=="daily");
-    const j = i + dir;
-    if(j < 0 || j >= daily.length) return;
-    const reordered = [...daily];
-    [reordered[i], reordered[j]] = [reordered[j], reordered[i]];
-    const nt = [...reordered, ...rest];
-    setTpl(nt); saveAll(nt, comps, plr);
+  function onDragStart(i){dragIdx.current=i;}
+  function onDragEnter(i){dragOver.current=i;}
+  function onDragEnd(){
+    const from=dragIdx.current,to=dragOver.current;
+    if(from===null||to===null||from===to){dragIdx.current=null;dragOver.current=null;return;}
+    const dailyTpl=tpl.filter(t=>t.frequency==="daily");
+    const rest=tpl.filter(t=>t.frequency!=="daily");
+    const reordered=[...dailyTpl];
+    const [moved]=reordered.splice(from,1);reordered.splice(to,0,moved);
+    const nt=[...reordered,...rest];
+    setTpl(nt);saveAll(nt,comps,plr);
+    dragIdx.current=null;dragOver.current=null;
   }
 
   function doExport(){
@@ -529,21 +550,24 @@ export default function App() {
                 ?<button onClick={()=>setReorderMode(false)} style={{background:"linear-gradient(135deg,rgba(56,189,248,.2),rgba(56,189,248,.1))",border:"1px solid rgba(56,189,248,.6)",color:"#38bdf8",borderRadius:9,padding:"8px 14px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>✓ FERTIG</button>
                 :<>
                   <button onClick={()=>setReorderMode(true)} style={{background:"rgba(71,85,105,.15)",border:"1px solid rgba(71,85,105,.35)",color:"#64748b",borderRadius:9,padding:"8px 10px",fontSize:15,lineHeight:1}} title="Reihenfolge ändern">⇅</button>
-                  <button onClick={()=>setShowAdd(true)} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ QUEST</button>
+                  <button onClick={openAdd} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ QUEST</button>
                 </>
               }
             </div>
           </div>
           {reorderMode&&<div style={{fontSize:10,color:"#334155",textAlign:"center",marginBottom:10,letterSpacing:.5}}>Quests per Drag & Drop sortieren</div>}
-          {dailyQ.length===0?<EmptyState/>:dailyQ.filter(t=>t.frequency==="daily").map((t,i,arr)=>(
-            <div key={t.id} style={{position:"relative",display:"flex",alignItems:"center",gap:0}}>
-              {reorderMode&&<div style={{display:"flex",flexDirection:"column",gap:3,marginRight:8,flexShrink:0}}>
-                <button onClick={()=>moveQuest(i,-1)} disabled={i===0}
-                  style={{width:28,height:28,borderRadius:7,border:"1px solid rgba(56,189,248,.3)",background:"rgba(56,189,248,.08)",color:i===0?"#1e2840":"#38bdf8",fontSize:13,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>▲</button>
-                <button onClick={()=>moveQuest(i,1)} disabled={i===arr.length-1}
-                  style={{width:28,height:28,borderRadius:7,border:"1px solid rgba(56,189,248,.3)",background:"rgba(56,189,248,.08)",color:i===arr.length-1?"#1e2840":"#38bdf8",fontSize:13,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>▼</button>
+          {dailyQ.length===0?<EmptyState/>:dailyQ.filter(t=>t.frequency==="daily").map((t,i)=>(
+            <div key={t.id}
+              draggable={reorderMode}
+              onDragStart={reorderMode?()=>onDragStart(i):undefined}
+              onDragEnter={reorderMode?()=>onDragEnter(i):undefined}
+              onDragEnd={reorderMode?onDragEnd:undefined}
+              onDragOver={reorderMode?e=>e.preventDefault():undefined}
+              style={{position:"relative",transition:"background .15s",borderRadius:14,background:reorderMode?"rgba(56,189,248,.03)":"transparent"}}>
+              {reorderMode&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:32,display:"flex",alignItems:"center",justifyContent:"center",zIndex:10,cursor:"grab"}}>
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>{[0,1,2].map(j=><div key={j} style={{width:16,height:2,background:"#38bdf8",borderRadius:1,opacity:.5}}/>)}</div>
               </div>}
-              <div style={{flex:1}}>
+              <div style={{paddingLeft:reorderMode?32:0}}>
                 {t.repeatable?<RepeatRow t={t}/>:<NormalRow t={t} done={doneIds.has(t.id)} onToggle={()=>!reorderMode&&(doneIds.has(t.id)?doUndo(t.id):doComplete(t))}/>}
               </div>
             </div>
@@ -554,7 +578,7 @@ export default function App() {
         {tab==="week"&&<>
           {/* Week navigation */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-            <button onClick={()=>setWeekOffset(o=>o-1)} style={{background:"rgba(56,189,248,.08)",border:"1px solid rgba(56,189,248,.2)",color:"#38bdf8",borderRadius:9,padding:"7px 13px",fontSize:16,lineHeight:1}}><</button>
+            <button onClick={()=>setWeekOffset(o=>o-1)} style={{background:"rgba(56,189,248,.08)",border:"1px solid rgba(56,189,248,.2)",color:"#38bdf8",borderRadius:9,padding:"7px 13px",fontSize:16,lineHeight:1}}>{'<'}</button>
             <div style={{textAlign:"center",flex:1,padding:"0 8px"}}>
               {weekOffset===0
                 ?<div style={{fontFamily:"'Orbitron',monospace",fontSize:10,color:"#38bdf8",letterSpacing:2}}>AKTUELLE WOCHE</div>
@@ -622,7 +646,7 @@ export default function App() {
         {tab==="month"&&<>
           {/* Month navigation */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-            <button onClick={()=>setMonthOffset(o=>o-1)} style={{background:"rgba(56,189,248,.08)",border:"1px solid rgba(56,189,248,.2)",color:"#38bdf8",borderRadius:9,padding:"7px 13px",fontSize:16,lineHeight:1}}><</button>
+            <button onClick={()=>setMonthOffset(o=>o-1)} style={{background:"rgba(56,189,248,.08)",border:"1px solid rgba(56,189,248,.2)",color:"#38bdf8",borderRadius:9,padding:"7px 13px",fontSize:16,lineHeight:1}}>{'<'}</button>
             <div style={{textAlign:"center",flex:1,padding:"0 8px"}}>
               <div style={{fontFamily:"'Orbitron',monospace",fontSize:monthOffset===0?11:10,color:monthOffset===0?"#38bdf8":"#64748b",letterSpacing:2}}>{MONTHS_DE[mLabel.month].toUpperCase()} {mLabel.year}</div>
               {monthOffset===0&&<div style={{fontSize:9,color:"#2d3f55",letterSpacing:1,marginTop:2}}>AKTUELLER MONAT</div>}
@@ -666,22 +690,25 @@ export default function App() {
               <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#38bdf8",letterSpacing:2}}>TEMPLATES</div>
               <div style={{fontSize:11,color:"#2d3f55",marginTop:3}}>{dailyQ.length} daily · {weeklyQ.length} weekly · {onceQ.length} einmalig</div>
             </div>
-            <button onClick={()=>setShowAdd(true)} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ NEW</button>
+            <div style={{display:"flex",gap:7}}>
+              <button onClick={()=>setTplSort(s=>s==='alpha'?'manual':'alpha')} style={{background:tplSort==='alpha'?"rgba(56,189,248,.15)":"rgba(71,85,105,.1)",border:"1px solid rgba(56,189,248,.3)",color:tplSort==='alpha'?"#38bdf8":"#64748b",borderRadius:9,padding:"8px 10px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif"}}>A-Z</button>
+              <button onClick={openAdd} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ NEW</button>
+            </div>
           </div>
 
           {dailyQ.length>0&&<>
             <div style={{fontSize:9,color:"#38bdf8",letterSpacing:2,fontWeight:700,marginBottom:10,fontFamily:"'Orbitron',monospace"}}>⚔️ DAILY</div>
-            {(tplSort==="alpha"?[...dailyQ].sort((a,b)=>a.name.localeCompare(b.name)):dailyQ).map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(
+            {(tplSort==='alpha'?[...dailyQ].sort((a,b)=>a.name.localeCompare(b.name)):dailyQ).map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(
               <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} onEdit={()=>openEdit(t)} extra={t.repeatable&&<Tag color="#fbbf24" label="🔁 REPEAT"/>}/>
             );})}
           </>}
           {weeklyQ.length>0&&<>
             <div style={{fontSize:9,color:"#c084fc",letterSpacing:2,fontWeight:700,margin:"16px 0 10px",fontFamily:"'Orbitron',monospace"}}>📅 WEEKLY</div>
-            {(tplSort==="alpha"?[...weeklyQ].sort((a,b)=>a.name.localeCompare(b.name)):weeklyQ).map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(<TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} onEdit={()=>openEdit(t)}/>);})}
+            {(tplSort==='alpha'?[...weeklyQ].sort((a,b)=>a.name.localeCompare(b.name)):weeklyQ).map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(<TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} onEdit={()=>openEdit(t)}/>);})}
           </>}
           {onceQ.length>0&&<>
             <div style={{fontSize:9,color:"#fb923c",letterSpacing:2,fontWeight:700,margin:"16px 0 10px",fontFamily:"'Orbitron',monospace"}}>✅ EINMALIG</div>
-            {(tplSort==="alpha"?[...onceQ].sort((a,b)=>a.name.localeCompare(b.name)):onceQ).map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,done=(plr.completedOnce||[]).includes(t.id);return(
+            {(tplSort==='alpha'?[...onceQ].sort((a,b)=>a.name.localeCompare(b.name)):onceQ).map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,done=(plr.completedOnce||[]).includes(t.id);return(
               <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} onEdit={()=>openEdit(t)} done={done}
                 extra={<Tag color={done?"#4ade80":"#fb923c"} label={done?"✓ ERLEDIGT":"1x EINMALIG"}/>}
                 onReset={done?()=>doResetOnce(t.id):null}/>
@@ -819,10 +846,10 @@ export default function App() {
       })()}
 
       {/* ADD MODAL */}
-      {showAdd&&<div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.88)",backdropFilter:"blur(12px)",display:"flex",alignItems:"flex-end"}} onClick={e=>{if(e.target===e.currentTarget){setShowAdd(false);setEditingId(null);}}}>
+      {showAdd&&<div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.88)",backdropFilter:"blur(12px)",display:"flex",alignItems:"flex-end"}} onClick={e=>{if(e.target===e.currentTarget){setShowAdd(false);setEditingId(null);}}} >
         <div className="modal-sheet" style={{width:"100%",maxWidth:480,margin:"0 auto",background:"#080d1c",borderRadius:"24px 24px 0 0",border:"1px solid #1a2840",borderBottom:"none",padding:"24px 18px 48px",paddingBottom:"max(48px,env(safe-area-inset-bottom,48px))"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
-            <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,color:"#38bdf8",letterSpacing:2}}>{editingId?"QUEST BEARBEITEN":"ADD QUEST"}</div>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,color:"#38bdf8",letterSpacing:2}}>{editingId?'QUEST BEARBEITEN':'ADD QUEST'}</div>
             <button onClick={()=>{setShowAdd(false);setEditingId(null);}} style={{background:"none",border:"none",color:"#475569",fontSize:22,padding:"0 4px",lineHeight:1}}>✕</button>
           </div>
           <div style={{marginBottom:16}}>
@@ -873,252 +900,7 @@ export default function App() {
             </div>
           </div>
           <button onClick={doSaveQuest} disabled={!newQ.name.trim()} style={{width:"100%",padding:"16px",borderRadius:13,border:"none",background:newQ.name.trim()?"linear-gradient(135deg,#1d4ed8,#38bdf8)":"#111929",color:newQ.name.trim()?"#fff":"#2d3f55",fontFamily:"'Orbitron',monospace",fontSize:13,fontWeight:700,letterSpacing:2,boxShadow:newQ.name.trim()?"0 4px 24px rgba(56,189,248,.25)":"none",transition:"all .2s"}}>
-            {editingId?"ÄNDERUNGEN SPEICHERN":"QUEST HINZUFÜGEN"}
-          </button>
-        </div>
-      </div>}
-    </div>
-  );
-}
-
-// ─── Micro Components ─────────────────────────────────────────────────────────
-function Tag({color,label}){return<span style={{fontSize:9,padding:"2px 7px",borderRadius:20,fontWeight:700,letterSpacing:.5,color,background:color+"15"}}>{label}</span>;}
-function XPLabel({earned,bon,done,color}){return<><div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:700,color:done?"#2d3f55":color}}>+{earned}<span style={{fontSize:8}}>XP</span></div>{bon>0&&!done&&<div style={{fontSize:9,color:"#fbbf24"}}>🔥+{bon}</div>}</>;}
-function Circle({done,color}){return<div style={{width:30,height:30,borderRadius:"50%",border:`2px solid ${done?"#1a2540":color+"55"}`,background:done?color+"22":"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s"}}>{done&&<span style={{color,fontSize:15,fontWeight:700}}>✓</span>}</div>;}
-function SecHead({label,color,count,sub,onAdd,btnColor}){return<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-  <div><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color,letterSpacing:2}}>{label}</div><div style={{fontSize:9,color,background:color+"20",border:`1px solid ${color}50`,borderRadius:20,padding:"2px 8px",fontWeight:700}}>{count}</div></div><div style={{fontSize:11,color:"#2d3f55",marginTop:2}}>{sub}</div></div>
-  <button onClick={onAdd} style={{background:btnColor+"18",border:`1px solid ${btnColor}`,color:btnColor,borderRadius:9,padding:"8px 14px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ QUEST</button>
-</div>;}
-function HR(){return<div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(56,189,248,.12),transparent)",margin:"6px 0 18px"}}/>;}
-function EmptyState(){return<div style={{textAlign:"center",padding:"40px 20px"}}><div style={{fontSize:40}}>⚔️</div><div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#1a2540",marginTop:12,letterSpacing:2}}>NO ACTIVE QUESTS</div></div>;}
-function TplRow({t,d,cat,onDelete,onEdit,done=false,extra,onReset}){return(
-  <div style={{background:"rgba(12,18,40,.9)",border:`1px solid ${done?"rgba(74,222,128,.15)":"#1a2840"}`,borderRadius:13,padding:"13px 15px",marginBottom:10,display:"flex",alignItems:"center",gap:12,opacity:done?.65:1}}>
-    <div style={{fontSize:22}}>{t.emoji}</div>
-    <div style={{flex:1}}>
-      <div style={{fontWeight:700,fontSize:15,color:done?"#475569":"#e2e8f0",textDecoration:done?"line-through":"none"}}>{t.name}</div>
-      <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
-        <Tag color={cat.color} label={cat.label.toUpperCase()}/>
-        <Tag color={d.color} label={`${d.label.toUpperCase()} · ${d.xp} XP`}/>
-        {extra}
-      </div>
-    </div>
-    <div style={{display:"flex",gap:6}}>
-      {onReset&&<button onClick={onReset} style={{background:"rgba(56,189,248,.1)",border:"1px solid rgba(56,189,248,.3)",color:"#38bdf8",borderRadius:9,padding:"8px 10px",fontSize:12,flexShrink:0}}>↺</button>}
-      {onEdit&&<button onClick={onEdit} style={{background:"rgba(56,189,248,.08)",border:"1px solid rgba(56,189,248,.25)",color:"#38bdf8",borderRadius:9,padding:"9px 11px",fontSize:14,flexShrink:0}}>✏️</button>}
-      <button onClick={onDelete} style={{background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",color:"#f87171",borderRadius:9,padding:"9px 11px",fontSize:14,flexShrink:0}}>🗑</button>
-    </div>
-  </div>
-);}            <div style={{display:"flex",gap:7}}>
-              <button onClick={()=>setTplSort(s=>s==="alpha"?"manual":"alpha")} style={{background:tplSort==="alpha"?"rgba(56,189,248,.15)":"rgba(71,85,105,.1)",border:`1px solid ${tplSort==="alpha"?"rgba(56,189,248,.5)":"rgba(71,85,105,.3)"}`,color:tplSort==="alpha"?"#38bdf8":"#64748b",borderRadius:9,padding:"8px 10px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:.5}}>A-Z</button>
-              <button onClick={openAdd} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ NEW</button>
-            </div>
-          </div>
-
-          {dailyQ.length>0&&<>
-            <div style={{fontSize:9,color:"#38bdf8",letterSpacing:2,fontWeight:700,marginBottom:10,fontFamily:"'Orbitron',monospace"}}>⚔️ DAILY</div>
-            {dailyQ.map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(
-              <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} extra={t.repeatable&&<Tag color="#fbbf24" label="🔁 REPEAT"/>}/>
-            );})}
-          </>}
-          {weeklyQ.length>0&&<>
-            <div style={{fontSize:9,color:"#c084fc",letterSpacing:2,fontWeight:700,margin:"16px 0 10px",fontFamily:"'Orbitron',monospace"}}>📅 WEEKLY</div>
-            {weeklyQ.map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(<TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)}/>);})}
-          </>}
-          {onceQ.length>0&&<>
-            <div style={{fontSize:9,color:"#fb923c",letterSpacing:2,fontWeight:700,margin:"16px 0 10px",fontFamily:"'Orbitron',monospace"}}>✅ EINMALIG</div>
-            {onceQ.map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,done=(plr.completedOnce||[]).includes(t.id);return(
-              <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} done={done}
-                extra={<Tag color={done?"#4ade80":"#fb923c"} label={done?"✓ ERLEDIGT":"1x EINMALIG"}/>}
-                onReset={done?()=>doResetOnce(t.id):null}/>
-            );})}
-          </>}
-          {tpl.length===0&&<div style={{textAlign:"center",padding:44,color:"#1a2840",fontFamily:"'Orbitron',monospace",fontSize:11,letterSpacing:2}}>NO TEMPLATES</div>}
-        </>}
-
-        {/* ═══ PROFIL ═══════════════════════════════════════════════════════════ */}
-        {tab==="profil"&&<>
-
-          {/* Achievements */}
-          <div style={{marginBottom:24}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-              <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#fbbf24",letterSpacing:2}}>ACHIEVEMENTS</div>
-              <div style={{fontSize:11,color:"#2d3f55"}}>{migAchs(plr.achievements||[]).length}/{ACHIEVEMENTS.length + ACHIEVEMENTS.filter(a=>a.tiers).length*2} Stufen erreicht</div>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-              {ACHIEVEMENTS.map(a=>{
-                if(a.tiers){
-                  const plrAchs=migAchs(plr.achievements||[]);
-                  const curLevel=getAchLevel(plrAchs,a.id);
-                  const nextTier=a.tiers.find(t=>t.level>curLevel);
-                  const curTier=a.tiers.find(t=>t.level===curLevel);
-                  const tc=curLevel>0?TIER_COLORS[curLevel]:"#1e2840";
-                  const te=curLevel>0?TIER_EMOJI[curLevel]:"";
-                  return(
-                    <div key={a.id} style={{background:curLevel>0?`${tc}10`:"rgba(255,255,255,.02)",border:`1px solid ${curLevel>0?tc+"50":"#1e2840"}`,borderRadius:12,padding:"12px 8px",textAlign:"center"}}>
-                      <div style={{fontSize:24}}>{a.emoji}</div>
-                      {curLevel>0&&<div style={{fontSize:13,marginTop:2}}>{te}</div>}
-                      <div style={{fontSize:11,fontWeight:700,color:curLevel>0?tc:"#64748b",marginTop:4,lineHeight:1.3}}>{a.title}</div>
-                      {curTier
-                        ?<div style={{fontSize:10,color:"#94a3b8",marginTop:3,lineHeight:1.4}}>{curTier.label}: {curTier.desc}</div>
-                        :<div style={{fontSize:10,color:"#475569",marginTop:3,lineHeight:1.4,opacity:.6}}>{a.tiers[0].desc}</div>
-                      }
-                      {nextTier&&curLevel>0&&<div style={{fontSize:9,color:"#334155",marginTop:3}}>▶ {nextTier.label}: {nextTier.desc}</div>}
-                      <div style={{display:"flex",justifyContent:"center",gap:3,marginTop:6}}>
-                        {a.tiers.map(t=><div key={t.level} style={{width:8,height:8,borderRadius:"50%",background:t.level<=curLevel?TIER_COLORS[t.level]:"#1e2840"}}/>)}
-                      </div>
-                    </div>
-                  );
-                } else {
-                  const done=migAchs(plr.achievements||[]).some(x=>x.id===a.id);
-                  return(
-                    <div key={a.id} style={{background:done?"rgba(251,191,36,.08)":"rgba(255,255,255,.025)",border:`1px solid ${done?"rgba(251,191,36,.35)":"#1e2840"}`,borderRadius:12,padding:"12px 8px",textAlign:"center",opacity:done?1:.55}}>
-                      <div style={{fontSize:24}}>{a.emoji}</div>
-                      {done&&<div style={{fontSize:13,marginTop:2}}>✓</div>}
-                      <div style={{fontSize:11,fontWeight:700,color:done?"#fbbf24":"#64748b",marginTop:4,lineHeight:1.3}}>{a.title}</div>
-                      <div style={{fontSize:10,color:done?"#94a3b8":"#475569",marginTop:4,lineHeight:1.4}}>{a.desc}</div>
-                    </div>
-                  );
-                }
-              })}
-            </div>
-          </div>
-          <HR/>
-
-          {/* Stats */}
-          <div style={{marginBottom:24}}>
-            <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#38bdf8",letterSpacing:2,marginBottom:12}}>STATISTIKEN</div>
-            {(()=>{
-              const topCatEntry=Object.entries(Object.fromEntries(Object.keys(CATS).map(k=>[k,comps.filter(c=>c.category===k).length]))).sort((a,b)=>b[1]-a[1])[0];
-              const activeDaysTotal=new Set(comps.map(c=>c.date)).size;
-              const avgXP=activeDaysTotal>0?Math.round(totalXP/activeDaysTotal):0;
-              return(
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                  {[
-                    {l:"Gesamt Quests",v:comps.length,c:"#38bdf8"},
-                    {l:"Gesamt XP",v:totalXP.toLocaleString(),c:"#c084fc"},
-                    {l:"Ø XP / Aktivtag",v:avgXP,c:"#4ade80"},
-                    {l:"Top Kategorie",v:topCatEntry&&topCatEntry[1]>0?`${CATS[topCatEntry[0]]?.emoji} ${CATS[topCatEntry[0]]?.label}`:"-",c:"#fbbf24"},
-                  ].map(({l,v,c})=>(
-                    <div key={l} style={{background:`${c}09`,border:`1px solid ${c}22`,borderRadius:12,padding:"12px 14px"}}>
-                      <div style={{fontFamily:"'Orbitron',monospace",fontSize:17,fontWeight:900,color:c}}>{v}</div>
-                      <div style={{fontSize:11,color:"#475569",marginTop:4}}>{l}</div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-          </div>
-          <HR/>
-
-          {/* Export / Import */}
-          <div style={{marginBottom:20}}>
-            <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#38bdf8",letterSpacing:2,marginBottom:10}}>DATEN</div>
-            <div style={{display:"flex",gap:10}}>
-              <button onClick={doExport} style={{flex:1,padding:"12px",borderRadius:11,border:"1px solid rgba(56,189,248,.4)",background:"rgba(56,189,248,.08)",color:"#38bdf8",fontFamily:"'Rajdhani',sans-serif",fontWeight:700,fontSize:13}}>⬇ Export JSON</button>
-              <label style={{flex:1,padding:"12px",borderRadius:11,border:"1px solid rgba(192,132,252,.4)",background:"rgba(192,132,252,.08)",color:"#c084fc",fontFamily:"'Rajdhani',sans-serif",fontWeight:700,fontSize:13,textAlign:"center",cursor:"pointer"}}>
-                ⬆ Import JSON
-                <input type="file" accept=".json" onChange={doImport} style={{display:"none"}}/>
-              </label>
-            </div>
-          </div>
-          <HR/>
-
-        </>}
-      </div>
-
-      {/* Day Detail Overlay */}
-      {selectedDay&&(()=>{
-        const dayComps=comps.filter(c=>c.date===selectedDay);
-        const dayXP=dayComps.reduce((s,c)=>s+c.earnedXp,0);
-        const label=new Date(selectedDay+"T12:00").toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-        return(
-          <div style={{position:"fixed",inset:0,zIndex:300,background:"rgba(0,0,0,.85)",backdropFilter:"blur(12px)",display:"flex",alignItems:"flex-end"}} onClick={()=>setSelectedDay(null)}>
-            <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:480,margin:"0 auto",background:"#080d1c",borderRadius:"22px 22px 0 0",border:"1px solid #1a2840",borderBottom:"none",padding:"22px 18px 44px",animation:"slideUp .2s ease"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18}}>
-                <div>
-                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#38bdf8",letterSpacing:2,marginBottom:4}}>{label.toUpperCase()}</div>
-                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:26,fontWeight:900,color:"#38bdf8"}}>{dayXP} <span style={{fontSize:12}}>XP</span></div>
-                  <div style={{fontSize:11,color:"#475569",marginTop:2}}>{dayComps.length} Quests abgeschlossen</div>
-                </div>
-                <button onClick={()=>setSelectedDay(null)} style={{background:"none",border:"none",color:"#475569",fontSize:22,lineHeight:1,padding:"4px"}}>✕</button>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:"50vh",overflowY:"auto"}}>
-                {dayComps.map(c=>{const d=DIFF[c.difficulty],cat=CATS[c.category]??CATS.sonstige;return(
-                  <div key={c.id} style={{display:"flex",alignItems:"center",gap:12,background:"rgba(12,18,40,.9)",border:"1px solid #1a2840",borderRadius:12,padding:"12px 14px"}}>
-                    <div style={{fontSize:22}}>{c.emoji}</div>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0"}}>{c.name}</div>
-                      <div style={{display:"flex",gap:5,marginTop:4,flexWrap:"wrap"}}>
-                        <Tag color={cat.color} label={cat.label.toUpperCase()}/>
-                        <Tag color={d.color} label={d.label.toUpperCase()}/>
-                      </div>
-                      {c.note&&<div style={{fontSize:11,color:"#64748b",marginTop:5}}>💬 {c.note}</div>}
-                    </div>
-                    <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,fontWeight:700,color:d.color,flexShrink:0}}>+{c.earnedXp}</div>
-                  </div>
-                );})}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ADD MODAL */}
-      {showAdd&&<div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.88)",backdropFilter:"blur(12px)",display:"flex",alignItems:"flex-end"}} onClick={e=>{if(e.target===e.currentTarget){setShowAdd(false);setEditingId(null);}}}>
-        <div className="modal-sheet" style={{width:"100%",maxWidth:480,margin:"0 auto",background:"#080d1c",borderRadius:"24px 24px 0 0",border:"1px solid #1a2840",borderBottom:"none",padding:"24px 18px 48px",paddingBottom:"max(48px,env(safe-area-inset-bottom,48px))"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
-            <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,color:"#38bdf8",letterSpacing:2}}>{editingId?"QUEST BEARBEITEN":"ADD QUEST"}</div>
-            <button onClick={()=>{setShowAdd(false);setEditingId(null);}} style={{background:"none",border:"none",color:"#475569",fontSize:22,padding:"0 4px",lineHeight:1}}>✕</button>
-          </div>
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:6,fontWeight:700}}>QUEST NAME</div>
-            <input value={newQ.name} onChange={e=>setNewQ(q=>({...q,name:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&doAdd()} placeholder="z.B. Wickeln" autoFocus style={{width:"100%",background:"#111929",border:"1px solid #1e2f48",borderRadius:11,padding:"13px 15px",color:"#e2e8f0",fontSize:16,fontFamily:"'Rajdhani',sans-serif",fontWeight:600}}/>
-          </div>
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:6,fontWeight:700}}>ICON</div>
-            <input value={newQ.emoji} onChange={e=>setNewQ(q=>({...q,emoji:e.target.value}))} style={{width:58,background:"#111929",border:"1px solid #1e2f48",borderRadius:11,padding:"10px",color:"#e2e8f0",fontSize:22,textAlign:"center"}}/>
-          </div>
-          <div style={{marginBottom:newQ.frequency==="daily"?10:16}}>
-            <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>HÄUFIGKEIT</div>
-            <div style={{display:"flex",gap:8}}>
-              {[{k:"daily",l:"🔄",sub:"TÄGLICH",c:"#38bdf8"},{k:"weekly",l:"📅",sub:"WÖCHENTLICH",c:"#c084fc"},{k:"once",l:"✅",sub:"EINMALIG",c:"#fb923c"}].map(({k,l,sub,c})=>(
-                <button key={k} onClick={()=>setNewQ(q=>({...q,frequency:k,repeatable:k==="daily"?q.repeatable:false}))} style={{flex:1,padding:"12px 4px",borderRadius:11,border:`1px solid ${newQ.frequency===k?c:"#1e2f48"}`,background:newQ.frequency===k?c+"16":"transparent",color:newQ.frequency===k?c:"#3a4f6a",fontFamily:"'Rajdhani',sans-serif",fontWeight:700}}>
-                  <div style={{fontSize:18}}>{l}</div><div style={{fontSize:10,marginTop:2}}>{sub}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-          {newQ.frequency==="daily"&&<div style={{marginBottom:14,background:"rgba(251,191,36,.06)",border:"1px solid rgba(251,191,36,.2)",borderRadius:11,padding:"11px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div>
-              <div style={{fontSize:13,fontWeight:700,color:"#fbbf24"}}>🔁 Mehrfach täglich</div>
-              <div style={{fontSize:11,color:"#3a4f6a",marginTop:1}}>Jeder Tap zählt (z.B. Wickeln)</div>
-            </div>
-            <div onClick={()=>setNewQ(q=>({...q,repeatable:!q.repeatable}))} style={{width:48,height:28,borderRadius:14,cursor:"pointer",background:newQ.repeatable?"#fbbf24":"#111929",border:`1px solid ${newQ.repeatable?"#fbbf24":"#1e2f48"}`,position:"relative",transition:"background .2s",flexShrink:0}}>
-              <div style={{width:20,height:20,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:newQ.repeatable?25:4,transition:"left .2s",boxShadow:"0 1px 4px rgba(0,0,0,.3)"}}/>
-            </div>
-          </div>}
-          <div style={{marginBottom:14}}>
-            <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>KATEGORIE</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-              {Object.entries(CATS).map(([k,v])=>(
-                <button key={k} onClick={()=>setNewQ(q=>({...q,category:k}))} style={{padding:"7px 12px",borderRadius:9,fontSize:11,fontWeight:700,border:`1px solid ${newQ.category===k?v.color:"#1e2f48"}`,background:newQ.category===k?v.color+"16":"transparent",color:newQ.category===k?v.color:"#3a4f6a",fontFamily:"'Rajdhani',sans-serif"}}>
-                  {v.emoji} {v.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div style={{marginBottom:24}}>
-            <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>SCHWIERIGKEIT</div>
-            <div style={{display:"flex",gap:8}}>
-              {Object.entries(DIFF).map(([k,v])=>(
-                <button key={k} onClick={()=>setNewQ(q=>({...q,difficulty:k}))} style={{flex:1,padding:"12px 0",borderRadius:11,border:`1px solid ${newQ.difficulty===k?v.color:"#1e2f48"}`,background:newQ.difficulty===k?v.color+"16":"transparent",color:newQ.difficulty===k?v.color:"#3a4f6a",fontFamily:"'Rajdhani',sans-serif",fontWeight:700}}>
-                  <div style={{fontSize:12}}>{v.label}</div><div style={{fontSize:10,opacity:.6}}>{v.xp} XP</div>
-                </button>
-              ))}
-            </div>
-          </div>
-          <button onClick={doSaveQuest} disabled={!newQ.name.trim()} style={{width:"100%",padding:"16px",borderRadius:13,border:"none",background:newQ.name.trim()?"linear-gradient(135deg,#1d4ed8,#38bdf8)":"#111929",color:newQ.name.trim()?"#fff":"#2d3f55",fontFamily:"'Orbitron',monospace",fontSize:13,fontWeight:700,letterSpacing:2,boxShadow:newQ.name.trim()?"0 4px 24px rgba(56,189,248,.25)":"none",transition:"all .2s"}}>
-            {editingId?"ÄNDERUNGEN SPEICHERN":"QUEST HINZUFÜGEN"}
+            {editingId?'AENDERUNGEN SPEICHERN':'QUEST HINZUFUEGEN'}
           </button>
         </div>
       </div>}
