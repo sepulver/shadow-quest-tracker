@@ -21,23 +21,54 @@ const RANKS = [
   { rank:"A", title:"Shadow Sovereign",   min:51, max:75,  color:"#c084fc" },
   { rank:"S", title:"Monarch of Shadows", min:76, max:100, color:"#f87171" },
 ];
+// Tiered achievements: levels array = [bronze, silver, gold] thresholds
+// Single-level achievements have no levels array
 const ACHIEVEMENTS = [
-  { id:"first_step",  emoji:"⚔️",  title:"First Step",     desc:"Erste Quest erledigt",          check: s => s.total >= 1 },
-  { id:"on_fire",     emoji:"🔥",  title:"On Fire",        desc:"7 Tage Streak",                 check: s => s.streak >= 7 },
-  { id:"iron_will",   emoji:"💪",  title:"Iron Will",      desc:"30 Tage Streak",                check: s => s.streak >= 30 },
-  { id:"awakened",    emoji:"✨",  title:"Awakened",       desc:"Level 5 erreicht",              check: s => s.level >= 5 },
-  { id:"d_rank",      emoji:"🗡️",  title:"Shadow Hunter",  desc:"D-Rank (Level 6)",              check: s => s.level >= 6 },
-  { id:"c_rank",      emoji:"🌟",  title:"Elite Hunter",   desc:"C-Rank (Level 16)",             check: s => s.level >= 16 },
-  { id:"quests_50",   emoji:"🏅",  title:"Half Century",   desc:"50 Quests abgeschlossen",       check: s => s.total >= 50 },
-  { id:"quests_100",  emoji:"🏆",  title:"Centurion",      desc:"100 Quests abgeschlossen",      check: s => s.total >= 100 },
-  { id:"xp_1000",     emoji:"💎",  title:"XP Grinder",     desc:"1.000 XP verdient",             check: s => s.totalXP >= 1000 },
-  { id:"xp_10000",    emoji:"🎖️",  title:"Shadow Veteran", desc:"10.000 XP verdient",            check: s => s.totalXP >= 10000 },
-  { id:"fitness_20",  emoji:"⚡",  title:"Warrior",        desc:"20 Fitness-Quests",             check: s => (s.cat.fitness||0) >= 20 },
-  { id:"family_20",   emoji:"❤️",  title:"Family First",   desc:"20 Familie-Quests",             check: s => (s.cat.familie||0) >= 20 },
-  { id:"home_20",     emoji:"🏠",  title:"Clean Slate",    desc:"20 Haushalt-Quests",            check: s => (s.cat.haushalt||0) >= 20 },
-  { id:"once_done",   emoji:"✅",  title:"Completionist",  desc:"Einmalig-Quest abgeschlossen",  check: s => s.onceDone >= 1 },
-  { id:"freeze_used", emoji:"❄️",  title:"Cool Head",      desc:"Streak-Freeze eingesetzt",      check: s => s.usedFreeze },
+  // ── Single-level ──────────────────────────────────────────────────────────
+  { id:"first_step",  emoji:"⚔️",  title:"First Step",    desc:"Erste Quest erledigt",         check: s=>s.total>=1 },
+  { id:"awakened",    emoji:"✨",  title:"Awakened",      desc:"Level 5 erreicht",             check: s=>s.level>=5 },
+  { id:"d_rank",      emoji:"🗡️",  title:"Shadow Hunter", desc:"D-Rank (Level 6)",             check: s=>s.level>=6 },
+  { id:"c_rank",      emoji:"🌟",  title:"Elite Hunter",  desc:"C-Rank (Level 16)",            check: s=>s.level>=16 },
+  { id:"once_done",   emoji:"✅",  title:"Completionist", desc:"Einmalig-Quest abgeschlossen", check: s=>s.onceDone>=1 },
+  { id:"freeze_used", emoji:"❄️",  title:"Cool Head",     desc:"Streak-Freeze eingesetzt",     check: s=>s.usedFreeze },
+  // ── Tiered (Bronze / Silber / Gold) ────────────────────────────────────────
+  { id:"streak",   emoji:"🔥", title:"Streak",      tiers:[
+    {level:1, label:"Bronze", desc:"7 Tage Streak",   check:s=>s.streak>=7},
+    {level:2, label:"Silber", desc:"30 Tage Streak",  check:s=>s.streak>=30},
+    {level:3, label:"Gold",   desc:"100 Tage Streak", check:s=>s.streak>=100},
+  ]},
+  { id:"quests",   emoji:"🏅", title:"Questor",     tiers:[
+    {level:1, label:"Bronze", desc:"100 Quests",   check:s=>s.total>=100},
+    {level:2, label:"Silber", desc:"250 Quests",   check:s=>s.total>=250},
+    {level:3, label:"Gold",   desc:"1.000 Quests", check:s=>s.total>=1000},
+  ]},
+  { id:"xp",       emoji:"💎", title:"XP Hunter",   tiers:[
+    {level:1, label:"Bronze", desc:"10.000 XP",    check:s=>s.totalXP>=10000},
+    {level:2, label:"Silber", desc:"50.000 XP",    check:s=>s.totalXP>=50000},
+    {level:3, label:"Gold",   desc:"250.000 XP",   check:s=>s.totalXP>=250000},
+  ]},
+  { id:"fitness",  emoji:"⚡", title:"Warrior",     tiers:[
+    {level:1, label:"Bronze", desc:"50 Fitness-Quests",   check:s=>(s.cat.fitness||0)>=50},
+    {level:2, label:"Silber", desc:"150 Fitness-Quests",  check:s=>(s.cat.fitness||0)>=150},
+    {level:3, label:"Gold",   desc:"500 Fitness-Quests",  check:s=>(s.cat.fitness||0)>=500},
+  ]},
+  { id:"familie",  emoji:"❤️", title:"Family First", tiers:[
+    {level:1, label:"Bronze", desc:"50 Familie-Quests",   check:s=>(s.cat.familie||0)>=50},
+    {level:2, label:"Silber", desc:"150 Familie-Quests",  check:s=>(s.cat.familie||0)>=150},
+    {level:3, label:"Gold",   desc:"500 Familie-Quests",  check:s=>(s.cat.familie||0)>=500},
+  ]},
+  { id:"haushalt", emoji:"🏠", title:"Clean Slate",  tiers:[
+    {level:1, label:"Bronze", desc:"50 Haushalt-Quests",  check:s=>(s.cat.haushalt||0)>=50},
+    {level:2, label:"Silber", desc:"150 Haushalt-Quests", check:s=>(s.cat.haushalt||0)>=150},
+    {level:3, label:"Gold",   desc:"500 Haushalt-Quests", check:s=>(s.cat.haushalt||0)>=500},
+  ]},
 ];
+// Helpers to work with the new format
+const TIER_COLORS = {1:"#cd7f32", 2:"#94a3b8", 3:"#fbbf24"}; // bronze, silver, gold
+const TIER_EMOJI  = {1:"🥉", 2:"🥈", 3:"🥇"};
+function getAchLevel(plrAchs, id){ const e=plrAchs.find(a=>a.id===id); return e?e.level:0; }
+// Migrate old string[] format → {id,level}[]
+function migAchs(arr){ if(!arr||!arr.length)return[]; if(typeof arr[0]==="string")return arr.map(id=>({id,level:1})); return arr; }
 const INIT_TPL = [
   { id:"t1", name:"Training",             category:"fitness",  difficulty:"hard",   frequency:"daily",  repeatable:false, emoji:"⚔️" },
   { id:"t2", name:"Müll rausbringen",     category:"haushalt", difficulty:"easy",   frequency:"daily",  repeatable:false, emoji:"🗑️" },
@@ -86,15 +117,31 @@ function monDays(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth
 function monLabel(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);return{month:ref.getMonth(),year:ref.getFullYear()};}
 function weekLabel(weekOffset=0){const days=weekDays(weekOffset);const start=new Date(days[0]+"T12:00"),end=new Date(days[6]+"T12:00");const fmt=d=>d.toLocaleDateString("de-DE",{day:"numeric",month:"short"});const d=new Date(days[0]+"T12:00");d.setHours(0,0,0,0);d.setDate(d.getDate()+4-(d.getDay()||7));const kw=Math.ceil((((d-new Date(d.getFullYear(),0,1))/86400000)+1)/7);return{label:`KW ${kw}: ${fmt(start)} – ${fmt(end)}`,kw};}
 function migTpl(arr){return arr.map(t=>({repeatable:false,...t,frequency:t.frequency??(t.recurring?"daily":"daily")}));}
-function mkPlayer(p={}){return{name:"Tim",streak:0,lastDate:null,completedOnce:[],weeklyGoal:500,freezes:1,lastFreezeMonth:null,achievements:[],usedFreeze:false,...p};}
+function mkPlayer(p={}){const base={name:"Tim",streak:0,lastDate:null,completedOnce:[],weeklyGoal:500,freezes:1,lastFreezeMonth:null,achievements:[],usedFreeze:false,...p};base.achievements=migAchs(base.achievements);return base;}
 
 function computeStats(comps, player, level) {
   const cat={};
   comps.forEach(c=>{cat[c.category]=(cat[c.category]||0)+1;});
   return { total:comps.length, totalXP:comps.reduce((s,c)=>s+c.earnedXp,0), streak:player.streak, level, cat, onceDone:(player.completedOnce||[]).length, usedFreeze:player.usedFreeze||false };
 }
-function checkNewAchievements(stats, unlockedIds) {
-  return ACHIEVEMENTS.filter(a => !unlockedIds.includes(a.id) && a.check(stats));
+// Returns array of {ach, newLevel} for newly reached tiers
+function checkAchievementUpdates(stats, plrAchs) {
+  const updates = [];
+  for(const a of ACHIEVEMENTS){
+    if(a.tiers){
+      const current = getAchLevel(plrAchs, a.id);
+      for(const tier of a.tiers){
+        if(tier.level > current && tier.check(stats)){
+          updates.push({ach:a, tier, newLevel:tier.level});
+        }
+      }
+    } else {
+      if(!plrAchs.find(x=>x.id===a.id) && a.check(stats)){
+        updates.push({ach:a, tier:null, newLevel:1});
+      }
+    }
+  }
+  return updates;
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────────
@@ -175,11 +222,18 @@ export default function App() {
   // ── Actions ─────────────────────────────────────────────────────────────────
   function afterComplete(newComps, newPlr) {
     const stats = computeStats(newComps, newPlr, lv.level);
-    const unlocked = checkNewAchievements(stats, newPlr.achievements||[]);
-    if(unlocked.length>0){
-      const ids = unlocked.map(a=>a.id);
-      newPlr = {...newPlr, achievements:[...(newPlr.achievements||[]),...ids]};
-      setAchFlash({ach:unlocked[0], key:Date.now()});
+    const plrAchs = migAchs(newPlr.achievements||[]);
+    const updates = checkAchievementUpdates(stats, plrAchs);
+    if(updates.length>0){
+      // Apply highest new level per achievement
+      let achs = [...plrAchs];
+      for(const u of updates){
+        const idx = achs.findIndex(x=>x.id===u.ach.id);
+        if(idx>=0) achs[idx]={...achs[idx],level:u.newLevel};
+        else achs.push({id:u.ach.id, level:u.newLevel});
+      }
+      newPlr = {...newPlr, achievements:achs};
+      setAchFlash({ach:updates[0].ach, tier:updates[0].tier, newLevel:updates[0].newLevel, key:Date.now()});
     }
     setComps(newComps); setPlr(newPlr); saveAll(tpl,newComps,newPlr);
   }
@@ -358,14 +412,16 @@ export default function App() {
       {flash&&<div key={flash.key} style={{position:"fixed",top:"50%",left:"50%",zIndex:9999,pointerEvents:"none",animation:"xpFloat 1.5s ease-out forwards",fontFamily:"'Orbitron',monospace",fontSize:32,fontWeight:900,color:"#38bdf8",textShadow:"0 0 18px #38bdf8,0 0 40px #38bdf870",letterSpacing:2,whiteSpace:"nowrap"}} onAnimationEnd={()=>setFlash(null)}>+{flash.xp} XP</div>}
 
       {/* Achievement Flash */}
-      {achFlash&&<div key={achFlash.key} style={{position:"fixed",bottom:90,left:"50%",transform:"translateX(-50%)",zIndex:9998,animation:"achSlide 3s ease-out forwards",background:"linear-gradient(135deg,rgba(15,20,40,.98),rgba(20,25,50,.98))",border:"1px solid rgba(251,191,36,.5)",borderRadius:16,padding:"14px 22px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 0 30px rgba(251,191,36,.2)",whiteSpace:"nowrap"}} onAnimationEnd={()=>setAchFlash(null)}>
-        <div style={{fontSize:28}}>{achFlash.ach.emoji}</div>
-        <div>
-          <div style={{fontSize:9,color:"#fbbf24",letterSpacing:2,fontFamily:"'Orbitron',monospace",fontWeight:700}}>ACHIEVEMENT UNLOCKED</div>
-          <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0",marginTop:2}}>{achFlash.ach.title}</div>
-          <div style={{fontSize:11,color:"#475569"}}>{achFlash.ach.desc}</div>
+      {achFlash&&(()=>{const tc=achFlash.tier?TIER_COLORS[achFlash.newLevel]:"#fbbf24",te=achFlash.tier?TIER_EMOJI[achFlash.newLevel]:"";return(
+        <div key={achFlash.key} style={{position:"fixed",bottom:90,left:"50%",transform:"translateX(-50%)",zIndex:9998,animation:"achSlide 3s ease-out forwards",background:"linear-gradient(135deg,rgba(15,20,40,.98),rgba(20,25,50,.98))",border:`1px solid ${tc}80`,borderRadius:16,padding:"14px 22px",display:"flex",alignItems:"center",gap:12,boxShadow:`0 0 30px ${tc}40`,whiteSpace:"nowrap"}} onAnimationEnd={()=>setAchFlash(null)}>
+          <div style={{fontSize:28}}>{achFlash.ach.emoji}</div>
+          <div>
+            <div style={{fontSize:9,color:tc,letterSpacing:2,fontFamily:"'Orbitron',monospace",fontWeight:700}}>{achFlash.tier?`${te} ${achFlash.tier.label.toUpperCase()} UNLOCKED`:"ACHIEVEMENT UNLOCKED"}</div>
+            <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0",marginTop:2}}>{achFlash.ach.title}</div>
+            <div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>{achFlash.tier?achFlash.tier.desc:achFlash.ach.desc}</div>
+          </div>
         </div>
-      </div>}
+      );})()}
 
       {/* Note Input */}
       {pendingNote&&<div style={{position:"fixed",bottom:80,left:0,right:0,zIndex:300,maxWidth:480,margin:"0 auto",padding:"0 16px",animation:"slideUp .2s ease"}}>
@@ -628,16 +684,44 @@ export default function App() {
           <div style={{marginBottom:24}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
               <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#fbbf24",letterSpacing:2}}>ACHIEVEMENTS</div>
-              <div style={{fontSize:11,color:"#2d3f55"}}>{(plr.achievements||[]).length}/{ACHIEVEMENTS.length} freigeschaltet</div>
+              <div style={{fontSize:11,color:"#2d3f55"}}>{migAchs(plr.achievements||[]).length}/{ACHIEVEMENTS.length + ACHIEVEMENTS.filter(a=>a.tiers).length*2} Stufen erreicht</div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-              {ACHIEVEMENTS.map(a=>{const done=(plr.achievements||[]).includes(a.id);return(
-                <div key={a.id} style={{background:done?"rgba(251,191,36,.08)":"rgba(255,255,255,.025)",border:`1px solid ${done?"rgba(251,191,36,.35)":"#1e2840"}`,borderRadius:12,padding:"12px 8px",textAlign:"center",opacity:done?1:.55}}>
-                  <div style={{fontSize:24}}>{a.emoji}</div>
-                  <div style={{fontSize:11,fontWeight:700,color:done?"#fbbf24":"#64748b",marginTop:5,lineHeight:1.3}}>{a.title}</div>
-                  <div style={{fontSize:10,color:done?"#94a3b8":"#475569",marginTop:4,lineHeight:1.4}}>{a.desc}</div>
-                </div>
-              );})}
+              {ACHIEVEMENTS.map(a=>{
+                if(a.tiers){
+                  const plrAchs=migAchs(plr.achievements||[]);
+                  const curLevel=getAchLevel(plrAchs,a.id);
+                  const nextTier=a.tiers.find(t=>t.level>curLevel);
+                  const curTier=a.tiers.find(t=>t.level===curLevel);
+                  const tc=curLevel>0?TIER_COLORS[curLevel]:"#1e2840";
+                  const te=curLevel>0?TIER_EMOJI[curLevel]:"";
+                  return(
+                    <div key={a.id} style={{background:curLevel>0?`${tc}10`:"rgba(255,255,255,.02)",border:`1px solid ${curLevel>0?tc+"50":"#1e2840"}`,borderRadius:12,padding:"12px 8px",textAlign:"center"}}>
+                      <div style={{fontSize:24}}>{a.emoji}</div>
+                      {curLevel>0&&<div style={{fontSize:13,marginTop:2}}>{te}</div>}
+                      <div style={{fontSize:11,fontWeight:700,color:curLevel>0?tc:"#64748b",marginTop:4,lineHeight:1.3}}>{a.title}</div>
+                      {curTier
+                        ?<div style={{fontSize:10,color:"#94a3b8",marginTop:3,lineHeight:1.4}}>{curTier.label}: {curTier.desc}</div>
+                        :<div style={{fontSize:10,color:"#475569",marginTop:3,lineHeight:1.4,opacity:.6}}>{a.tiers[0].desc}</div>
+                      }
+                      {nextTier&&curLevel>0&&<div style={{fontSize:9,color:"#334155",marginTop:3}}>▶ {nextTier.label}: {nextTier.desc}</div>}
+                      <div style={{display:"flex",justifyContent:"center",gap:3,marginTop:6}}>
+                        {a.tiers.map(t=><div key={t.level} style={{width:8,height:8,borderRadius:"50%",background:t.level<=curLevel?TIER_COLORS[t.level]:"#1e2840"}}/>)}
+                      </div>
+                    </div>
+                  );
+                } else {
+                  const done=migAchs(plr.achievements||[]).some(x=>x.id===a.id);
+                  return(
+                    <div key={a.id} style={{background:done?"rgba(251,191,36,.08)":"rgba(255,255,255,.025)",border:`1px solid ${done?"rgba(251,191,36,.35)":"#1e2840"}`,borderRadius:12,padding:"12px 8px",textAlign:"center",opacity:done?1:.55}}>
+                      <div style={{fontSize:24}}>{a.emoji}</div>
+                      {done&&<div style={{fontSize:13,marginTop:2}}>✓</div>}
+                      <div style={{fontSize:11,fontWeight:700,color:done?"#fbbf24":"#64748b",marginTop:4,lineHeight:1.3}}>{a.title}</div>
+                      <div style={{fontSize:10,color:done?"#94a3b8":"#475569",marginTop:4,lineHeight:1.4}}>{a.desc}</div>
+                    </div>
+                  );
+                }
+              })}
             </div>
           </div>
           <HR/>
