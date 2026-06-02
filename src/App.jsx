@@ -965,9 +965,15 @@ export default function App() {
               ))}
             </div>
           </div>
-          <button onClick={doSaveQuest} disabled={!newQ.name.trim()} style={{width:"100%",padding:"16px",borderRadius:13,border:"none",background:newQ.name.trim()?"linear-gradient(135deg,#1d4ed8,#38bdf8)":"#111929",color:newQ.name.trim()?"#fff":"#2d3f55",fontFamily:"'Orbitron',monospace",fontSize:13,fontWeight:700,letterSpacing:2,boxShadow:newQ.name.trim()?"0 4px 24px rgba(56,189,248,.25)":"none",transition:"all .2s"}}>
-            {editingId?'AENDERUNGEN SPEICHERN':'QUEST HINZUFUEGEN'}
+          <button onClick={doSaveQuest} disabled={!newQ.name.trim()} style={{width:"100%",padding:"15px",borderRadius:13,border:"none",background:newQ.name.trim()?"linear-gradient(135deg,#1d4ed8,#38bdf8)":"#111929",color:newQ.name.trim()?"#fff":"#2d3f55",fontFamily:"'Orbitron',monospace",fontSize:13,fontWeight:700,letterSpacing:2,boxShadow:newQ.name.trim()?"0 4px 24px rgba(56,189,248,.25)":"none",transition:"all .2s",marginBottom:10}}>
+            {editingId?'SPEICHERN':'QUEST HINZUFUEGEN'}
           </button>
+          <button onClick={()=>{setShowAdd(false);setEditingId(null);}} style={{width:"100%",padding:"14px",borderRadius:13,border:"1px solid #1e2f48",background:"transparent",color:"#475569",fontFamily:"'Rajdhani',sans-serif",fontSize:14,fontWeight:700,marginBottom:editingId?32:0}}>
+            ABBRECHEN
+          </button>
+          {editingId&&<button onClick={()=>{doDelete(editingId);setShowAdd(false);setEditingId(null);}} style={{width:"100%",padding:"14px",borderRadius:13,border:"1px solid rgba(248,113,113,.3)",background:"rgba(248,113,113,.06)",color:"#f87171",fontFamily:"'Rajdhani',sans-serif",fontSize:14,fontWeight:700}}>
+            🗑 QUEST LOESCHEN
+          </button>}
         </div>
       </div>}
     </div>
@@ -998,7 +1004,6 @@ function TplRow({t,d,cat,onDelete,onEdit,done=false,extra,onReset}){return(
     <div style={{display:"flex",gap:6}}>
       {onReset&&<button onClick={onReset} style={{background:"rgba(56,189,248,.1)",border:"1px solid rgba(56,189,248,.3)",color:"#38bdf8",borderRadius:9,padding:"8px 10px",fontSize:12,flexShrink:0}}>↺</button>}
       {onEdit&&<button onClick={onEdit} style={{background:"rgba(56,189,248,.08)",border:"1px solid rgba(56,189,248,.25)",color:"#38bdf8",borderRadius:9,padding:"9px 11px",fontSize:14,flexShrink:0}}>✏️</button>}
-      <button onClick={onDelete} style={{background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.25)",color:"#f87171",borderRadius:9,padding:"9px 11px",fontSize:14,flexShrink:0}}>🗑</button>
     </div>
   </div>
 );}
