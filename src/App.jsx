@@ -23,7 +23,7 @@ const RANKS = [
   { rank:"SS",  title:"Transcendent Hunter",    min:150, max:199, color:"#fb923c" },
   { rank:"SSS", title:"Ruler of the Shadows",   min:200, max:299, color:"#e879f9" },
   { rank:"NL",  title:"National Level Hunter",  min:300, max:499, color:"#67e8f9" },
-  { rank:"SM",  title:"Shadow Monarch",         min:500, max:99999,    color:"#fde68a" },
+  { rank:"SM",  title:"Shadow Monarch",         min:500, max:Infinity, color:"#fde68a" },
 ];
 // Tiered achievements: levels array = [bronze, silver, gold] thresholds
 // Single-level achievements have no levels array
@@ -113,7 +113,7 @@ const TODAY=()=>ld();
 const MONTH=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`};
 function wkStart(){const t=new Date(),o=(t.getDay()+6)%7,m=new Date(t);m.setDate(t.getDate()-o);return ld(m);}
 function lvlInfo(xp){let l=1,u=0;while(l<9999){const n=l*100;if(u+n>xp)break;u+=n;l++;}const i=xp-u,f=l*100;return{level:l,inLvl:i,forNext:f,pct:Math.min(100,(i/f)*100)};}
-function getRank(l){return RANKS.find(r=>l>=r.min&&l<=r.max)??RANKS[RANKS.length-1];}
+function getRank(l){return RANKS.find(r=>l>=r.min&&l<=r.max)??RANKS.at(-1);}
 function sBon(s){return Math.min(s*3,30);}
 function weekDays(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7,mon=new Date(t);mon.setDate(t.getDate()-o+weekOffset*7);return Array.from({length:7},(_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return ld(d);});}
 function weekStartFromOffset(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7,mon=new Date(t);mon.setDate(t.getDate()-o+weekOffset*7);return ld(mon);}
@@ -168,8 +168,7 @@ export default function App() {
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(null);
   const [reorderMode, setReorderMode] = useState(false);
-  const dragIdx = useRef(null);
-  const dragOver = useRef(null);
+
   const noteTimer = useRef(null);
 
   // Persist
@@ -292,18 +291,15 @@ export default function App() {
   }
   function doDelete(id){const nt=tpl.filter(t=>t.id!==id);setTpl(nt);saveAll(nt,comps,plr);}
 
-  function onDragStart(i){dragIdx.current=i;}
-  function onDragEnter(i){dragOver.current=i;}
-  function onDragEnd(){
-    const from=dragIdx.current,to=dragOver.current;
-    if(from===null||to===null||from===to){dragIdx.current=null;dragOver.current=null;return;}
-    const dailyTpl=tpl.filter(t=>t.frequency==="daily");
-    const rest=tpl.filter(t=>t.frequency!=="daily");
-    const reordered=[...dailyTpl];
-    const [moved]=reordered.splice(from,1);reordered.splice(to,0,moved);
-    const nt=[...reordered,...rest];
-    setTpl(nt);saveAll(nt,comps,plr);
-    dragIdx.current=null;dragOver.current=null;
+  function moveQuest(i, dir) {
+    const daily = tpl.filter(t=>t.frequency==="daily");
+    const rest  = tpl.filter(t=>t.frequency!=="daily");
+    const j = i + dir;
+    if(j < 0 || j >= daily.length) return;
+    const reordered = [...daily];
+    [reordered[i], reordered[j]] = [reordered[j], reordered[i]];
+    const nt = [...reordered, ...rest];
+    setTpl(nt); saveAll(nt, comps, plr);
   }
 
   function doExport(){
@@ -539,35 +535,19 @@ export default function App() {
             </div>
           </div>
           {reorderMode&&<div style={{fontSize:10,color:"#334155",textAlign:"center",marginBottom:10,letterSpacing:.5}}>Quests per Drag & Drop sortieren</div>}
-          {dailyQ.length===0?<EmptyState/>:(()=>{
-            const displayList = dragOrder
-              ? dragOrder.map(id=>tpl.find(t=>t.id===id)).filter(Boolean)
-              : dailyQ.filter(t=>t.frequency==="daily");
-            return(
-              <div ref={touchListRef}>
-                {displayList.map((t,i)=>(
-                  <div key={t.id}
-                    onTouchStart={e=>onTouchStartRow(e,i)}
-                    onTouchMove={onTouchMoveRow}
-                    onTouchEnd={onTouchEndRow}
-                    style={{position:"relative",borderRadius:14,
-                      background:reorderMode?"rgba(56,189,248,.04)":"transparent",
-                      border:reorderMode?"1px solid rgba(56,189,248,.12)":"1px solid transparent",
-                      marginBottom:reorderMode?6:0,
-                      touchAction:reorderMode?"none":"auto"}}>
-                    {reorderMode&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:36,display:"flex",alignItems:"center",justifyContent:"center",zIndex:10}}>
-                      <div style={{display:"flex",flexDirection:"column",gap:4,pointerEvents:"none"}}>
-                        {[0,1,2].map(j=><div key={j} style={{width:18,height:2,background:"#38bdf8",borderRadius:1,opacity:.6}}/>)}
-                      </div>
-                    </div>}
-                    <div style={{paddingLeft:reorderMode?36:0}}>
-                      {t.repeatable?<RepeatRow t={t}/>:<NormalRow t={t} done={doneIds.has(t.id)} onToggle={()=>!reorderMode&&(doneIds.has(t.id)?doUndo(t.id):doComplete(t))}/>}
-                    </div>
-                  </div>
-                ))}
+          {dailyQ.length===0?<EmptyState/>:dailyQ.filter(t=>t.frequency==="daily").map((t,i,arr)=>(
+            <div key={t.id} style={{position:"relative",display:"flex",alignItems:"center",gap:0}}>
+              {reorderMode&&<div style={{display:"flex",flexDirection:"column",gap:3,marginRight:8,flexShrink:0}}>
+                <button onClick={()=>moveQuest(i,-1)} disabled={i===0}
+                  style={{width:28,height:28,borderRadius:7,border:"1px solid rgba(56,189,248,.3)",background:"rgba(56,189,248,.08)",color:i===0?"#1e2840":"#38bdf8",fontSize:13,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>▲</button>
+                <button onClick={()=>moveQuest(i,1)} disabled={i===arr.length-1}
+                  style={{width:28,height:28,borderRadius:7,border:"1px solid rgba(56,189,248,.3)",background:"rgba(56,189,248,.08)",color:i===arr.length-1?"#1e2840":"#38bdf8",fontSize:13,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>▼</button>
+              </div>}
+              <div style={{flex:1}}>
+                {t.repeatable?<RepeatRow t={t}/>:<NormalRow t={t} done={doneIds.has(t.id)} onToggle={()=>!reorderMode&&(doneIds.has(t.id)?doUndo(t.id):doComplete(t))}/>}
               </div>
-            );
-          })()}
+            </div>
+          ))}
         </>}
 
         {/* ═══ WEEK ════════════════════════════════════════════════════════════ */}
