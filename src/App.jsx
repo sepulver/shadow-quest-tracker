@@ -126,7 +126,7 @@ function weekStartFromOffset(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7
 function monDays(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);const year=ref.getFullYear(),month=ref.getMonth(),f=new Date(year,month,1),la=new Date(year,month+1,0),pad=(f.getDay()+6)%7,arr=Array(pad).fill(null);for(let d=1;d<=la.getDate();d++)arr.push(ld(new Date(year,month,d)));return arr;}
 function monLabel(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);return{month:ref.getMonth(),year:ref.getFullYear()};}
 function weekLabel(weekOffset=0){const days=weekDays(weekOffset);const start=new Date(days[0]+"T12:00"),end=new Date(days[6]+"T12:00");const fmt=d=>d.toLocaleDateString("de-DE",{day:"numeric",month:"short"});const d=new Date(days[0]+"T12:00");d.setHours(0,0,0,0);d.setDate(d.getDate()+4-(d.getDay()||7));const kw=Math.ceil((((d-new Date(d.getFullYear(),0,1))/86400000)+1)/7);return{label:`KW ${kw}: ${fmt(start)} - ${fmt(end)}`,kw};}
-function migTpl(arr){return arr.map(t=>({repeatable:false,...t,frequency:t.frequency??(t.recurring?"daily":"daily")}));}
+function migTpl(arr){return arr.map(t=>({repeatable:false,activeDays:[],weekLimit:0,...t,frequency:t.frequency??(t.recurring?"daily":"daily")}));}
 function mkPlayer(p={}){const base={name:"Tim",streak:0,lastDate:null,completedOnce:[],weeklyGoal:500,freezes:1,lastFreezeMonth:null,achievements:[],usedFreeze:false,...p};base.achievements=migAchs(base.achievements);return base;}
 
 // Returns consecutive days streak for a specific template up to (not including) today
@@ -222,7 +222,16 @@ export default function App() {
   const weekXP     =useMemo(()=>weekC.reduce((s,c)=>s+c.earnedXp,0),[weekC]);
   const bon        =sBon(plr.streak);
   const dblXp      =isDblXpDay(today);
-  const dailyQ     =useMemo(()=>tpl.filter(t=>t.frequency==="daily"),[tpl]);
+  const todayDow   =useMemo(()=>(new Date().getDay()+6)%7,[]);// 0=Mo..6=So
+  const dailyQ     =useMemo(()=>tpl.filter(t=>{
+    if(t.frequency!=="daily")return false;
+    if(t.activeDays&&t.activeDays.length>0&&!t.activeDays.includes(todayDow))return false;
+    if(t.weekLimit>0){
+      const doneThisWeek=comps.filter(c=>c.templateId===t.id&&c.weekStart===ws).length;
+      if(doneThisWeek>=t.weekLimit)return false;
+    }
+    return true;
+  }),[tpl,todayDow,comps,ws]);
   const weeklyQ    =useMemo(()=>tpl.filter(t=>t.frequency==="weekly"),[tpl]);
   const onceQ      =useMemo(()=>tpl.filter(t=>t.frequency==="once"),[tpl]);
   const onceActive =useMemo(()=>onceQ.filter(t=>!(plr.completedOnce||[]).includes(t.id)),[onceQ,plr.completedOnce]);
@@ -309,12 +318,12 @@ export default function App() {
 
   function openAdd(){
     setEditingId(null);
-    setNewQ({name:'',category:'sonstige',difficulty:'normal',emoji:'📋',frequency:'daily',repeatable:false});
+    setNewQ({name:'',category:'sonstige',difficulty:'normal',emoji:'📋',frequency:'daily',repeatable:false,activeDays:[],weekLimit:0});
     setShowAdd(true);
   }
   function openEdit(t){
     setEditingId(t.id);
-    setNewQ({name:t.name,category:t.category,difficulty:t.difficulty,emoji:t.emoji,frequency:t.frequency,repeatable:t.repeatable||false});
+    setNewQ({name:t.name,category:t.category,difficulty:t.difficulty,emoji:t.emoji,frequency:t.frequency,repeatable:t.repeatable||false,activeDays:t.activeDays||[],weekLimit:t.weekLimit||0});
     setShowAdd(true);
   }
   function doSaveQuest(){
@@ -326,7 +335,7 @@ export default function App() {
       const id='t'+Date.now(),t={...newQ,id,name:newQ.name.trim()};
       const nt=[...tpl,t]; setTpl(nt); saveAll(nt,comps,plr);
     }
-    setNewQ({name:'',category:'sonstige',difficulty:'normal',emoji:'📋',frequency:'daily',repeatable:false});
+    setNewQ({name:'',category:'sonstige',difficulty:'normal',emoji:'📋',frequency:'daily',repeatable:false,activeDays:[],weekLimit:0});
     setEditingId(null); setShowAdd(false);
   }
   function doDelete(id){const nt=tpl.filter(t=>t.id!==id);setTpl(nt);saveAll(nt,comps,plr);}
@@ -385,6 +394,7 @@ export default function App() {
           <Tag color={(CATS[t.category]??CATS.sonstige).color} label={(CATS[t.category]??CATS.sonstige).label.toUpperCase()}/>
           <Tag color={d.color} label={d.label.toUpperCase()}/>
           {isWeekly&&<Tag color="#c084fc" label="📅 WEEKLY"/>}
+          {t.weekLimit>0&&<Tag color="#94a3b8" label={`${(comps.filter(c=>c.templateId===t.id&&c.weekStart===ws).length)}/${t.weekLimit}W`}/>}
           {qStreak>=2&&!done&&<span style={{fontSize:10,color:"#fbbf24",fontWeight:700}}>🔥{qStreak}</span>}
         </div>
       </div>
@@ -406,6 +416,7 @@ export default function App() {
           <Tag color={cat.color} label={cat.label.toUpperCase()}/>
           <Tag color={d.color} label={d.label.toUpperCase()}/>
           <Tag color="#fbbf24" label="🔁 REPEAT"/>
+          {t.weekLimit>0&&<Tag color="#94a3b8" label={`${(comps.filter(c=>c.templateId===t.id&&c.weekStart===ws).length)}/${t.weekLimit}W`}/>}
           {qStreak>=2&&<span style={{fontSize:10,color:"#fbbf24",fontWeight:700}}>🔥{qStreak}</span>}
         </div>
       </div>
@@ -915,6 +926,23 @@ export default function App() {
             </div>
             <div onClick={()=>setNewQ(q=>({...q,repeatable:!q.repeatable}))} style={{width:48,height:28,borderRadius:14,cursor:"pointer",background:newQ.repeatable?"#fbbf24":"#111929",border:`1px solid ${newQ.repeatable?"#fbbf24":"#1e2f48"}`,position:"relative",transition:"background .2s",flexShrink:0}}>
               <div style={{width:20,height:20,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:newQ.repeatable?25:4,transition:"left .2s",boxShadow:"0 1px 4px rgba(0,0,0,.3)"}}/>
+            </div>
+          </div>}
+          {newQ.frequency==="daily"&&<div style={{marginBottom:14}}>
+            <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>AKTIVE WOCHENTAGE <span style={{color:"#1e2f48",fontWeight:400}}>(leer = täglich)</span></div>
+            <div style={{display:"flex",gap:5}}>
+              {['Mo','Di','Mi','Do','Fr','Sa','So'].map((d,i)=>{
+                const on=(newQ.activeDays||[]).includes(i);
+                return(<button key={i} onClick={()=>setNewQ(q=>{const a=q.activeDays||[];return{...q,activeDays:on?a.filter(x=>x!==i):[...a,i]};})} style={{flex:1,padding:"8px 0",borderRadius:8,border:`1px solid ${on?"#38bdf8":"#1e2f48"}`,background:on?"rgba(56,189,248,.15)":"transparent",color:on?"#38bdf8":"#3a4f6a",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif"}}>{d}</button>);
+              })}
+            </div>
+          </div>}
+          {newQ.frequency==="daily"&&<div style={{marginBottom:14}}>
+            <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>MAX. PRO WOCHE <span style={{color:"#1e2f48",fontWeight:400}}>(0 = unbegrenzt)</span></div>
+            <div style={{display:"flex",gap:6}}>
+              {[0,1,2,3,4,5,6,7].map(n=>(
+                <button key={n} onClick={()=>setNewQ(q=>({...q,weekLimit:n}))} style={{flex:1,padding:"8px 0",borderRadius:8,border:`1px solid ${newQ.weekLimit===n?"#c084fc":"#1e2f48"}`,background:newQ.weekLimit===n?"rgba(192,132,252,.15)":"transparent",color:newQ.weekLimit===n?"#c084fc":"#3a4f6a",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif"}}>{n===0?'∞':n}</button>
+              ))}
             </div>
           </div>}
           <div style={{marginBottom:14}}>
