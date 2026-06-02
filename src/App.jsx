@@ -14,12 +14,16 @@ const CATS = {
   sonstige: { label:"Sonstige", emoji:"📋",  color:"#94a3b8" },
 };
 const RANKS = [
-  { rank:"E", title:"Awakened One",       min:1,  max:5,   color:"#94a3b8" },
-  { rank:"D", title:"Shadow Hunter",      min:6,  max:15,  color:"#4ade80" },
-  { rank:"C", title:"Elite Hunter",       min:16, max:30,  color:"#38bdf8" },
-  { rank:"B", title:"Master Hunter",      min:31, max:50,  color:"#fbbf24" },
-  { rank:"A", title:"Shadow Sovereign",   min:51, max:75,  color:"#c084fc" },
-  { rank:"S", title:"Monarch of Shadows", min:76, max:100, color:"#f87171" },
+  { rank:"E",   title:"Awakened One",          min:1,   max:9,   color:"#94a3b8" },
+  { rank:"D",   title:"Shadow Hunter",          min:10,  max:24,  color:"#4ade80" },
+  { rank:"C",   title:"Elite Hunter",           min:25,  max:49,  color:"#38bdf8" },
+  { rank:"B",   title:"Master Hunter",          min:50,  max:74,  color:"#fbbf24" },
+  { rank:"A",   title:"Shadow Sovereign",       min:75,  max:99,  color:"#c084fc" },
+  { rank:"S",   title:"Monarch of Shadows",     min:100, max:149, color:"#f87171" },
+  { rank:"SS",  title:"Transcendent Hunter",    min:150, max:199, color:"#fb923c" },
+  { rank:"SSS", title:"Ruler of the Shadows",   min:200, max:299, color:"#e879f9" },
+  { rank:"NL",  title:"National Level Hunter",  min:300, max:499, color:"#67e8f9" },
+  { rank:"SМ",  title:"Shadow Monarch",         min:500, max:Infinity, color:"#fde68a" },
 ];
 // Tiered achievements: levels array = [bronze, silver, gold] thresholds
 // Single-level achievements have no levels array
@@ -108,7 +112,7 @@ function ld(d=new Date()){return`${d.getFullYear()}-${String(d.getMonth()+1).pad
 const TODAY=()=>ld();
 const MONTH=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`};
 function wkStart(){const t=new Date(),o=(t.getDay()+6)%7,m=new Date(t);m.setDate(t.getDate()-o);return ld(m);}
-function lvlInfo(xp){let l=1,u=0;while(l<100){const n=l*100;if(u+n>xp)break;u+=n;l++;}const i=xp-u,f=l*100;return{level:l,inLvl:i,forNext:f,pct:Math.min(100,(i/f)*100)};}
+function lvlInfo(xp){let l=1,u=0;while(true){const n=l*100;if(u+n>xp)break;u+=n;l++;}const i=xp-u,f=l*100;return{level:l,inLvl:i,forNext:f,pct:Math.min(100,(i/f)*100)};}
 function getRank(l){return RANKS.find(r=>l>=r.min&&l<=r.max)??RANKS.at(-1);}
 function sBon(s){return Math.min(s*3,30);}
 function weekDays(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7,mon=new Date(t);mon.setDate(t.getDate()-o+weekOffset*7);return Array.from({length:7},(_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return ld(d);});}
@@ -163,6 +167,7 @@ export default function App() {
   const [weekOffset,  setWeekOffset]  = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(null);
+  const [reorderMode, setReorderMode] = useState(false);
   const dragIdx = useRef(null);
   const dragOver = useRef(null);
   const noteTimer = useRef(null);
@@ -523,15 +528,30 @@ export default function App() {
               </div>
               <div style={{fontSize:11,color:"#2d3f55",marginTop:2}}>{new Date().toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long"})}</div>
             </div>
-            <button onClick={()=>setShowAdd(true)} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ QUEST</button>
+            <div style={{display:"flex",gap:7,alignItems:"center"}}>
+              {reorderMode
+                ?<button onClick={()=>setReorderMode(false)} style={{background:"linear-gradient(135deg,rgba(56,189,248,.2),rgba(56,189,248,.1))",border:"1px solid rgba(56,189,248,.6)",color:"#38bdf8",borderRadius:9,padding:"8px 14px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>✓ FERTIG</button>
+                :<>
+                  <button onClick={()=>setReorderMode(true)} style={{background:"rgba(71,85,105,.15)",border:"1px solid rgba(71,85,105,.35)",color:"#64748b",borderRadius:9,padding:"8px 10px",fontSize:15,lineHeight:1}} title="Reihenfolge ändern">⇅</button>
+                  <button onClick={()=>setShowAdd(true)} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ QUEST</button>
+                </>
+              }
+            </div>
           </div>
+          {reorderMode&&<div style={{fontSize:10,color:"#334155",textAlign:"center",marginBottom:10,letterSpacing:.5}}>Quests per Drag & Drop sortieren</div>}
           {dailyQ.length===0?<EmptyState/>:dailyQ.filter(t=>t.frequency==="daily").map((t,i)=>(
-            <div key={t.id} draggable onDragStart={()=>onDragStart(i)} onDragEnter={()=>onDragEnter(i)} onDragEnd={onDragEnd} onDragOver={e=>e.preventDefault()} style={{position:"relative"}}>
-              <div style={{position:"absolute",left:0,top:0,bottom:0,width:28,display:"flex",alignItems:"center",justifyContent:"center",zIndex:10,cursor:"grab",opacity:.3}}>
-                <div style={{display:"flex",flexDirection:"column",gap:3}}>{[0,1,2].map(j=><div key={j} style={{width:14,height:2,background:"#475569",borderRadius:1}}/>)}</div>
-              </div>
-              <div style={{paddingLeft:28}}>
-                {t.repeatable?<RepeatRow t={t}/>:<NormalRow t={t} done={doneIds.has(t.id)} onToggle={()=>doneIds.has(t.id)?doUndo(t.id):doComplete(t)}/>}
+            <div key={t.id}
+              draggable={reorderMode}
+              onDragStart={reorderMode?()=>onDragStart(i):undefined}
+              onDragEnter={reorderMode?()=>onDragEnter(i):undefined}
+              onDragEnd={reorderMode?onDragEnd:undefined}
+              onDragOver={reorderMode?e=>e.preventDefault():undefined}
+              style={{position:"relative",transition:"background .15s",borderRadius:14,background:reorderMode?"rgba(56,189,248,.03)":"transparent"}}>
+              {reorderMode&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:32,display:"flex",alignItems:"center",justifyContent:"center",zIndex:10,cursor:"grab"}}>
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>{[0,1,2].map(j=><div key={j} style={{width:16,height:2,background:"#38bdf8",borderRadius:1,opacity:.5}}/>)}</div>
+              </div>}
+              <div style={{paddingLeft:reorderMode?32:0}}>
+                {t.repeatable?<RepeatRow t={t}/>:<NormalRow t={t} done={doneIds.has(t.id)} onToggle={()=>!reorderMode&&(doneIds.has(t.id)?doUndo(t.id):doComplete(t))}/>}
               </div>
             </div>
           ))}
