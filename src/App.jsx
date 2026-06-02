@@ -115,6 +115,9 @@ export default function App() {
   const [newQ, setNewQ] = useState({name:"",category:"sonstige",difficulty:"normal",emoji:"📋",frequency:"daily",repeatable:false});
   const [weekOffset,  setWeekOffset]  = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const dragIdx = useRef(null);
+  const dragOver = useRef(null);
   const noteTimer = useRef(null);
 
   // Persist
@@ -229,6 +232,20 @@ export default function App() {
     setShowAdd(false);
   }
   function doDelete(id){const nt=tpl.filter(t=>t.id!==id);setTpl(nt);saveAll(nt,comps,plr);}
+
+  function onDragStart(i){dragIdx.current=i;}
+  function onDragEnter(i){dragOver.current=i;}
+  function onDragEnd(){
+    const from=dragIdx.current,to=dragOver.current;
+    if(from===null||to===null||from===to){dragIdx.current=null;dragOver.current=null;return;}
+    const dailyTpl=tpl.filter(t=>t.frequency==="daily");
+    const rest=tpl.filter(t=>t.frequency!=="daily");
+    const reordered=[...dailyTpl];
+    const [moved]=reordered.splice(from,1);reordered.splice(to,0,moved);
+    const nt=[...reordered,...rest];
+    setTpl(nt);saveAll(nt,comps,plr);
+    dragIdx.current=null;dragOver.current=null;
+  }
 
   function doExport(){
     const data=JSON.stringify({templates:tpl,completions:comps,player:plr},null,2);
@@ -452,7 +469,16 @@ export default function App() {
             </div>
             <button onClick={()=>setShowAdd(true)} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ QUEST</button>
           </div>
-          {dailyQ.length===0?<EmptyState/>:dailyQ.map(t=>t.repeatable?<RepeatRow key={t.id} t={t}/>:<NormalRow key={t.id} t={t} done={doneIds.has(t.id)} onToggle={()=>doneIds.has(t.id)?doUndo(t.id):doComplete(t)}/>)}
+          {dailyQ.length===0?<EmptyState/>:dailyQ.filter(t=>t.frequency==="daily").map((t,i)=>(
+            <div key={t.id} draggable onDragStart={()=>onDragStart(i)} onDragEnter={()=>onDragEnter(i)} onDragEnd={onDragEnd} onDragOver={e=>e.preventDefault()} style={{position:"relative"}}>
+              <div style={{position:"absolute",left:0,top:0,bottom:0,width:28,display:"flex",alignItems:"center",justifyContent:"center",zIndex:10,cursor:"grab",opacity:.3}}>
+                <div style={{display:"flex",flexDirection:"column",gap:3}}>{[0,1,2].map(j=><div key={j} style={{width:14,height:2,background:"#475569",borderRadius:1}}/>)}</div>
+              </div>
+              <div style={{paddingLeft:28}}>
+                {t.repeatable?<RepeatRow t={t}/>:<NormalRow t={t} done={doneIds.has(t.id)} onToggle={()=>doneIds.has(t.id)?doUndo(t.id):doComplete(t)}/>}
+              </div>
+            </div>
+          ))}
         </>}
 
         {/* ═══ WEEK ════════════════════════════════════════════════════════════ */}
@@ -548,7 +574,7 @@ export default function App() {
               {monArr.map((d,i)=>{
                 if(!d)return<div key={"p"+i} style={{aspectRatio:"1"}}/>;
                 const xp=xpDay[d]||0,it=xp>0?Math.min(1,xp/120):0,isT=d===today,day=parseInt(d.split("-")[2]);
-                return(<div key={d} style={{aspectRatio:"1",borderRadius:8,background:xp>0?`rgba(56,189,248,${.07+it*.55})`:"rgba(255,255,255,.018)",border:`1px solid ${isT?"#38bdf8":xp>0?"rgba(56,189,248,.22)":"transparent"}`,boxShadow:isT?"0 0 12px #38bdf845":"none",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:2}}>
+                return(<div key={d} onClick={()=>xp>0&&setSelectedDay(d)} style={{aspectRatio:"1",borderRadius:8,background:xp>0?`rgba(56,189,248,${.07+it*.55})`:"rgba(255,255,255,.018)",border:`1px solid ${isT?"#38bdf8":xp>0?"rgba(56,189,248,.22)":"transparent"}`,boxShadow:isT?"0 0 12px #38bdf845":"none",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:2,cursor:xp>0?"pointer":"default"}}>
                   <div style={{fontSize:10,color:isT?"#38bdf8":xp>0?"#94a3b8":"#2d3f55",fontWeight:isT?700:400}}>{day}</div>
                   {xp>0&&<div style={{fontSize:6,color:"#38bdf8",fontFamily:"'Orbitron',monospace",lineHeight:1,marginTop:1}}>{xp}</div>}
                 </div>);
@@ -606,13 +632,39 @@ export default function App() {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
               {ACHIEVEMENTS.map(a=>{const done=(plr.achievements||[]).includes(a.id);return(
-                <div key={a.id} style={{background:done?"rgba(251,191,36,.06)":"rgba(255,255,255,.02)",border:`1px solid ${done?"rgba(251,191,36,.3)":"#1a2840"}`,borderRadius:12,padding:"10px 8px",textAlign:"center",opacity:done?1:.45}}>
-                  <div style={{fontSize:22}}>{a.emoji}</div>
-                  <div style={{fontSize:10,fontWeight:700,color:done?"#fbbf24":"#475569",marginTop:4,lineHeight:1.2}}>{a.title}</div>
-                  <div style={{fontSize:8,color:"#334155",marginTop:3,lineHeight:1.3}}>{a.desc}</div>
+                <div key={a.id} style={{background:done?"rgba(251,191,36,.08)":"rgba(255,255,255,.025)",border:`1px solid ${done?"rgba(251,191,36,.35)":"#1e2840"}`,borderRadius:12,padding:"12px 8px",textAlign:"center",opacity:done?1:.55}}>
+                  <div style={{fontSize:24}}>{a.emoji}</div>
+                  <div style={{fontSize:11,fontWeight:700,color:done?"#fbbf24":"#64748b",marginTop:5,lineHeight:1.3}}>{a.title}</div>
+                  <div style={{fontSize:10,color:done?"#94a3b8":"#475569",marginTop:4,lineHeight:1.4}}>{a.desc}</div>
                 </div>
               );})}
             </div>
+          </div>
+          <HR/>
+
+          {/* Stats */}
+          <div style={{marginBottom:24}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#38bdf8",letterSpacing:2,marginBottom:12}}>STATISTIKEN</div>
+            {(()=>{
+              const topCatEntry=Object.entries(Object.fromEntries(Object.keys(CATS).map(k=>[k,comps.filter(c=>c.category===k).length]))).sort((a,b)=>b[1]-a[1])[0];
+              const activeDaysTotal=new Set(comps.map(c=>c.date)).size;
+              const avgXP=activeDaysTotal>0?Math.round(totalXP/activeDaysTotal):0;
+              return(
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  {[
+                    {l:"Gesamt Quests",v:comps.length,c:"#38bdf8"},
+                    {l:"Gesamt XP",v:totalXP.toLocaleString(),c:"#c084fc"},
+                    {l:"Ø XP / Aktivtag",v:avgXP,c:"#4ade80"},
+                    {l:"Top Kategorie",v:topCatEntry&&topCatEntry[1]>0?`${CATS[topCatEntry[0]]?.emoji} ${CATS[topCatEntry[0]]?.label}`:"-",c:"#fbbf24"},
+                  ].map(({l,v,c})=>(
+                    <div key={l} style={{background:`${c}09`,border:`1px solid ${c}22`,borderRadius:12,padding:"12px 14px"}}>
+                      <div style={{fontFamily:"'Orbitron',monospace",fontSize:17,fontWeight:900,color:c}}>{v}</div>
+                      <div style={{fontSize:11,color:"#475569",marginTop:4}}>{l}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
           <HR/>
 
@@ -631,6 +683,43 @@ export default function App() {
 
         </>}
       </div>
+
+      {/* Day Detail Overlay */}
+      {selectedDay&&(()=>{
+        const dayComps=comps.filter(c=>c.date===selectedDay);
+        const dayXP=dayComps.reduce((s,c)=>s+c.earnedXp,0);
+        const label=new Date(selectedDay+"T12:00").toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+        return(
+          <div style={{position:"fixed",inset:0,zIndex:300,background:"rgba(0,0,0,.85)",backdropFilter:"blur(12px)",display:"flex",alignItems:"flex-end"}} onClick={()=>setSelectedDay(null)}>
+            <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:480,margin:"0 auto",background:"#080d1c",borderRadius:"22px 22px 0 0",border:"1px solid #1a2840",borderBottom:"none",padding:"22px 18px 44px",animation:"slideUp .2s ease"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18}}>
+                <div>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#38bdf8",letterSpacing:2,marginBottom:4}}>{label.toUpperCase()}</div>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:26,fontWeight:900,color:"#38bdf8"}}>{dayXP} <span style={{fontSize:12}}>XP</span></div>
+                  <div style={{fontSize:11,color:"#475569",marginTop:2}}>{dayComps.length} Quests abgeschlossen</div>
+                </div>
+                <button onClick={()=>setSelectedDay(null)} style={{background:"none",border:"none",color:"#475569",fontSize:22,lineHeight:1,padding:"4px"}}>✕</button>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:"50vh",overflowY:"auto"}}>
+                {dayComps.map(c=>{const d=DIFF[c.difficulty],cat=CATS[c.category]??CATS.sonstige;return(
+                  <div key={c.id} style={{display:"flex",alignItems:"center",gap:12,background:"rgba(12,18,40,.9)",border:"1px solid #1a2840",borderRadius:12,padding:"12px 14px"}}>
+                    <div style={{fontSize:22}}>{c.emoji}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0"}}>{c.name}</div>
+                      <div style={{display:"flex",gap:5,marginTop:4,flexWrap:"wrap"}}>
+                        <Tag color={cat.color} label={cat.label.toUpperCase()}/>
+                        <Tag color={d.color} label={d.label.toUpperCase()}/>
+                      </div>
+                      {c.note&&<div style={{fontSize:11,color:"#64748b",marginTop:5}}>💬 {c.note}</div>}
+                    </div>
+                    <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,fontWeight:700,color:d.color,flexShrink:0}}>+{c.earnedXp}</div>
+                  </div>
+                );})}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ADD MODAL */}
       {showAdd&&<div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.88)",backdropFilter:"blur(12px)",display:"flex",alignItems:"flex-end"}} onClick={e=>{if(e.target===e.currentTarget)setShowAdd(false)}}>
