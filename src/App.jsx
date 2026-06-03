@@ -184,7 +184,7 @@ export default function App() {
   const [noteText, setNoteText] = useState("");
   const [editGoal, setEditGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
-  const [newQ, setNewQ] = useState({name:"",category:"sonstige",difficulty:"normal",emoji:"📋",frequency:"daily",repeatable:false});
+  const [newQ, setNewQ] = useState({name:"",category:"sonstige",difficulty:"normal",emoji:"📋",frequency:"daily",repeatable:false,noteEnabled:false});
   const [weekOffset,  setWeekOffset]  = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(null);
@@ -288,7 +288,7 @@ export default function App() {
     setFlash({xp:earned,key:Date.now()});
     // Note prompt
     clearTimeout(noteTimer.current);
-    setPendingNote({compId:id}); setNoteText("");
+    if(t.noteEnabled){setPendingNote({compId:id}); setNoteText("");}
     noteTimer.current=setTimeout(()=>setPendingNote(null),8000);
     afterComplete(nc,np);
   }
@@ -316,14 +316,15 @@ export default function App() {
   }
   function doBreakStreak(){const np={...plr,streak:0};setPlr(np);saveAll(tpl,comps,np);setShowFreeze(false);}
 
+  const EMPTY_Q={name:'',category:'sonstige',difficulty:'normal',emoji:'📋',frequency:'daily',repeatable:false,activeDays:[],weekLimit:0,noteEnabled:false};
   function openAdd(){
     setEditingId(null);
-    setNewQ({name:'',category:'sonstige',difficulty:'normal',emoji:'📋',frequency:'daily',repeatable:false,activeDays:[],weekLimit:0});
+    setNewQ({...EMPTY_Q});
     setShowAdd(true);
   }
   function openEdit(t){
     setEditingId(t.id);
-    setNewQ({name:t.name,category:t.category,difficulty:t.difficulty,emoji:t.emoji,frequency:t.frequency,repeatable:t.repeatable||false,activeDays:t.activeDays||[],weekLimit:t.weekLimit||0});
+    setNewQ({name:t.name,category:t.category,difficulty:t.difficulty,emoji:t.emoji,frequency:t.frequency,repeatable:t.repeatable||false,activeDays:t.activeDays||[],weekLimit:t.weekLimit||0,noteEnabled:t.noteEnabled||false});
     setShowAdd(true);
   }
   function doSaveQuest(){
@@ -335,7 +336,7 @@ export default function App() {
       const id='t'+Date.now(),t={...newQ,id,name:newQ.name.trim()};
       const nt=[...tpl,t]; setTpl(nt); saveAll(nt,comps,plr);
     }
-    setNewQ({name:'',category:'sonstige',difficulty:'normal',emoji:'📋',frequency:'daily',repeatable:false,activeDays:[],weekLimit:0});
+    setNewQ({...EMPTY_Q});
     setEditingId(null); setShowAdd(false);
   }
   function doDelete(id){const nt=tpl.filter(t=>t.id!==id);setTpl(nt);saveAll(nt,comps,plr);}
@@ -896,84 +897,103 @@ export default function App() {
 
       {/* ADD MODAL */}
       {showAdd&&<div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.88)",backdropFilter:"blur(12px)",display:"flex",alignItems:"flex-end"}} onClick={e=>{if(e.target===e.currentTarget){setShowAdd(false);setEditingId(null);}}} >
-        <div className="modal-sheet" style={{width:"100%",maxWidth:480,margin:"0 auto",background:"#080d1c",borderRadius:"24px 24px 0 0",border:"1px solid #1a2840",borderBottom:"none",padding:"24px 18px 48px",paddingBottom:"max(48px,env(safe-area-inset-bottom,48px))"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
-            <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,color:"#38bdf8",letterSpacing:2}}>{editingId?'QUEST BEARBEITEN':'ADD QUEST'}</div>
-            <button onClick={()=>{setShowAdd(false);setEditingId(null);}} style={{background:"none",border:"none",color:"#475569",fontSize:22,padding:"0 4px",lineHeight:1}}>✕</button>
-          </div>
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:6,fontWeight:700}}>QUEST NAME</div>
-            <input value={newQ.name} onChange={e=>setNewQ(q=>({...q,name:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&doAdd()} placeholder="z.B. Wickeln" autoFocus style={{width:"100%",background:"#111929",border:"1px solid #1e2f48",borderRadius:11,padding:"13px 15px",color:"#e2e8f0",fontSize:16,fontFamily:"'Rajdhani',sans-serif",fontWeight:600}}/>
-          </div>
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:6,fontWeight:700}}>ICON</div>
-            <input value={newQ.emoji} onChange={e=>setNewQ(q=>({...q,emoji:e.target.value}))} style={{width:58,background:"#111929",border:"1px solid #1e2f48",borderRadius:11,padding:"10px",color:"#e2e8f0",fontSize:22,textAlign:"center"}}/>
-          </div>
-          <div style={{marginBottom:newQ.frequency==="daily"?10:16}}>
-            <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>HÄUFIGKEIT</div>
-            <div style={{display:"flex",gap:8}}>
-              {[{k:"daily",l:"🔄",sub:"TÄGLICH",c:"#38bdf8"},{k:"weekly",l:"📅",sub:"WÖCHENTLICH",c:"#c084fc"},{k:"once",l:"✅",sub:"EINMALIG",c:"#fb923c"}].map(({k,l,sub,c})=>(
-                <button key={k} onClick={()=>setNewQ(q=>({...q,frequency:k,repeatable:k==="daily"?q.repeatable:false}))} style={{flex:1,padding:"12px 4px",borderRadius:11,border:`1px solid ${newQ.frequency===k?c:"#1e2f48"}`,background:newQ.frequency===k?c+"16":"transparent",color:newQ.frequency===k?c:"#3a4f6a",fontFamily:"'Rajdhani',sans-serif",fontWeight:700}}>
-                  <div style={{fontSize:18}}>{l}</div><div style={{fontSize:10,marginTop:2}}>{sub}</div>
-                </button>
-              ))}
+        <div className="modal-sheet" style={{width:"100%",maxWidth:480,margin:"0 auto",background:"#080d1c",borderRadius:"24px 24px 0 0",border:"1px solid #1a2840",borderBottom:"none",display:"flex",flexDirection:"column",maxHeight:"92dvh"}}>
+          {/* ── Fixed Header ── */}
+          <div style={{padding:"20px 18px 0",flexShrink:0}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,color:"#38bdf8",letterSpacing:2}}>{editingId?'QUEST BEARBEITEN':'ADD QUEST'}</div>
+              <button onClick={()=>{setShowAdd(false);setEditingId(null);}} style={{background:"none",border:"none",color:"#475569",fontSize:22,padding:"0 4px",lineHeight:1}}>✕</button>
             </div>
           </div>
-          {newQ.frequency==="daily"&&<div style={{marginBottom:14,background:"rgba(251,191,36,.06)",border:"1px solid rgba(251,191,36,.2)",borderRadius:11,padding:"11px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div>
-              <div style={{fontSize:13,fontWeight:700,color:"#fbbf24"}}>🔁 Mehrfach täglich</div>
-              <div style={{fontSize:11,color:"#3a4f6a",marginTop:1}}>Jeder Tap zählt (z.B. Wickeln)</div>
+          {/* ── Scrollable Form Body ── */}
+          <div style={{overflowY:"auto",WebkitOverflowScrolling:"touch",flex:1,padding:"0 18px"}}>
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:6,fontWeight:700}}>QUEST NAME</div>
+              <input value={newQ.name} onChange={e=>setNewQ(q=>({...q,name:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&doSaveQuest()} placeholder="z.B. Wickeln" autoFocus style={{width:"100%",background:"#111929",border:"1px solid #1e2f48",borderRadius:11,padding:"13px 15px",color:"#e2e8f0",fontSize:16,fontFamily:"'Rajdhani',sans-serif",fontWeight:600,boxSizing:"border-box"}}/>
             </div>
-            <div onClick={()=>setNewQ(q=>({...q,repeatable:!q.repeatable}))} style={{width:48,height:28,borderRadius:14,cursor:"pointer",background:newQ.repeatable?"#fbbf24":"#111929",border:`1px solid ${newQ.repeatable?"#fbbf24":"#1e2f48"}`,position:"relative",transition:"background .2s",flexShrink:0}}>
-              <div style={{width:20,height:20,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:newQ.repeatable?25:4,transition:"left .2s",boxShadow:"0 1px 4px rgba(0,0,0,.3)"}}/>
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:6,fontWeight:700}}>ICON</div>
+              <input value={newQ.emoji} onChange={e=>setNewQ(q=>({...q,emoji:e.target.value}))} style={{width:58,background:"#111929",border:"1px solid #1e2f48",borderRadius:11,padding:"10px",color:"#e2e8f0",fontSize:22,textAlign:"center"}}/>
             </div>
-          </div>}
-          {newQ.frequency==="daily"&&<div style={{marginBottom:14}}>
-            <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>AKTIVE WOCHENTAGE <span style={{color:"#1e2f48",fontWeight:400}}>(leer = täglich)</span></div>
-            <div style={{display:"flex",gap:5}}>
-              {['Mo','Di','Mi','Do','Fr','Sa','So'].map((d,i)=>{
-                const on=(newQ.activeDays||[]).includes(i);
-                return(<button key={i} onClick={()=>setNewQ(q=>{const a=q.activeDays||[];return{...q,activeDays:on?a.filter(x=>x!==i):[...a,i]};})} style={{flex:1,padding:"8px 0",borderRadius:8,border:`1px solid ${on?"#38bdf8":"#1e2f48"}`,background:on?"rgba(56,189,248,.15)":"transparent",color:on?"#38bdf8":"#3a4f6a",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif"}}>{d}</button>);
-              })}
+            <div style={{marginBottom:newQ.frequency==="daily"?10:16}}>
+              <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>HÄUFIGKEIT</div>
+              <div style={{display:"flex",gap:8}}>
+                {[{k:"daily",l:"🔄",sub:"TÄGLICH",c:"#38bdf8"},{k:"weekly",l:"📅",sub:"WÖCHENTLICH",c:"#c084fc"},{k:"once",l:"✅",sub:"EINMALIG",c:"#fb923c"}].map(({k,l,sub,c})=>(
+                  <button key={k} onClick={()=>setNewQ(q=>({...q,frequency:k,repeatable:k==="daily"?q.repeatable:false}))} style={{flex:1,padding:"12px 4px",borderRadius:11,border:`1px solid ${newQ.frequency===k?c:"#1e2f48"}`,background:newQ.frequency===k?c+"16":"transparent",color:newQ.frequency===k?c:"#3a4f6a",fontFamily:"'Rajdhani',sans-serif",fontWeight:700}}>
+                    <div style={{fontSize:18}}>{l}</div><div style={{fontSize:10,marginTop:2}}>{sub}</div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>}
-          {newQ.frequency==="daily"&&<div style={{marginBottom:14}}>
-            <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>MAX. PRO WOCHE <span style={{color:"#1e2f48",fontWeight:400}}>(0 = unbegrenzt)</span></div>
-            <div style={{display:"flex",gap:6}}>
-              {[0,1,2,3,4,5,6,7].map(n=>(
-                <button key={n} onClick={()=>setNewQ(q=>({...q,weekLimit:n}))} style={{flex:1,padding:"8px 0",borderRadius:8,border:`1px solid ${newQ.weekLimit===n?"#c084fc":"#1e2f48"}`,background:newQ.weekLimit===n?"rgba(192,132,252,.15)":"transparent",color:newQ.weekLimit===n?"#c084fc":"#3a4f6a",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif"}}>{n===0?'∞':n}</button>
-              ))}
+            {newQ.frequency==="daily"&&<div style={{marginBottom:14,background:"rgba(251,191,36,.06)",border:"1px solid rgba(251,191,36,.2)",borderRadius:11,padding:"11px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:"#fbbf24"}}>🔁 Mehrfach täglich</div>
+                <div style={{fontSize:11,color:"#3a4f6a",marginTop:1}}>Jeder Tap zählt (z.B. Wickeln)</div>
+              </div>
+              <div onClick={()=>setNewQ(q=>({...q,repeatable:!q.repeatable}))} style={{width:48,height:28,borderRadius:14,cursor:"pointer",background:newQ.repeatable?"#fbbf24":"#111929",border:`1px solid ${newQ.repeatable?"#fbbf24":"#1e2f48"}`,position:"relative",transition:"background .2s",flexShrink:0}}>
+                <div style={{width:20,height:20,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:newQ.repeatable?25:4,transition:"left .2s",boxShadow:"0 1px 4px rgba(0,0,0,.3)"}}/>
+              </div>
+            </div>}
+            {newQ.frequency==="daily"&&<div style={{marginBottom:14}}>
+              <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>AKTIVE WOCHENTAGE <span style={{color:"#1e2f48",fontWeight:400}}>(leer = täglich)</span></div>
+              <div style={{display:"flex",gap:5}}>
+                {['Mo','Di','Mi','Do','Fr','Sa','So'].map((d,i)=>{
+                  const on=(newQ.activeDays||[]).includes(i);
+                  return(<button key={i} onClick={()=>setNewQ(q=>{const a=q.activeDays||[];return{...q,activeDays:on?a.filter(x=>x!==i):[...a,i]};})} style={{flex:1,padding:"8px 0",borderRadius:8,border:`1px solid ${on?"#38bdf8":"#1e2f48"}`,background:on?"rgba(56,189,248,.15)":"transparent",color:on?"#38bdf8":"#3a4f6a",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif"}}>{d}</button>);
+                })}
+              </div>
+            </div>}
+            {newQ.frequency==="daily"&&<div style={{marginBottom:14}}>
+              <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>MAX. PRO WOCHE <span style={{color:"#1e2f48",fontWeight:400}}>(0 = unbegrenzt)</span></div>
+              <div style={{display:"flex",gap:6}}>
+                {[0,1,2,3,4,5,6,7].map(n=>(
+                  <button key={n} onClick={()=>setNewQ(q=>({...q,weekLimit:n}))} style={{flex:1,padding:"8px 0",borderRadius:8,border:`1px solid ${newQ.weekLimit===n?"#c084fc":"#1e2f48"}`,background:newQ.weekLimit===n?"rgba(192,132,252,.15)":"transparent",color:newQ.weekLimit===n?"#c084fc":"#3a4f6a",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif"}}>{n===0?'∞':n}</button>
+                ))}
+              </div>
+            </div>}
+            {/* ── noteEnabled Toggle ── */}
+            <div style={{marginBottom:14,background:"rgba(56,189,248,.04)",border:"1px solid rgba(56,189,248,.15)",borderRadius:11,padding:"11px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:"#38bdf8"}}>📝 Kommentar nach Abschluss</div>
+                <div style={{fontSize:11,color:"#3a4f6a",marginTop:1}}>Notizfeld beim Erledigen anzeigen</div>
+              </div>
+              <div onClick={()=>setNewQ(q=>({...q,noteEnabled:!q.noteEnabled}))} style={{width:48,height:28,borderRadius:14,cursor:"pointer",background:newQ.noteEnabled?"#38bdf8":"#111929",border:`1px solid ${newQ.noteEnabled?"#38bdf8":"#1e2f48"}`,position:"relative",transition:"background .2s",flexShrink:0}}>
+                <div style={{width:20,height:20,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:newQ.noteEnabled?25:4,transition:"left .2s",boxShadow:"0 1px 4px rgba(0,0,0,.3)"}}/>
+              </div>
             </div>
-          </div>}
-          <div style={{marginBottom:14}}>
-            <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>KATEGORIE</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-              {Object.entries(CATS).map(([k,v])=>(
-                <button key={k} onClick={()=>setNewQ(q=>({...q,category:k}))} style={{padding:"7px 12px",borderRadius:9,fontSize:11,fontWeight:700,border:`1px solid ${newQ.category===k?v.color:"#1e2f48"}`,background:newQ.category===k?v.color+"16":"transparent",color:newQ.category===k?v.color:"#3a4f6a",fontFamily:"'Rajdhani',sans-serif"}}>
-                  {v.emoji} {v.label}
-                </button>
-              ))}
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>KATEGORIE</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {Object.entries(CATS).map(([k,v])=>(
+                  <button key={k} onClick={()=>setNewQ(q=>({...q,category:k}))} style={{padding:"7px 12px",borderRadius:9,fontSize:11,fontWeight:700,border:`1px solid ${newQ.category===k?v.color:"#1e2f48"}`,background:newQ.category===k?v.color+"16":"transparent",color:newQ.category===k?v.color:"#3a4f6a",fontFamily:"'Rajdhani',sans-serif"}}>
+                    {v.emoji} {v.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{marginBottom:8}}>
+              <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>SCHWIERIGKEIT</div>
+              <div style={{display:"flex",gap:8}}>
+                {Object.entries(DIFF).map(([k,v])=>(
+                  <button key={k} onClick={()=>setNewQ(q=>({...q,difficulty:k}))} style={{flex:1,padding:"12px 0",borderRadius:11,border:`1px solid ${newQ.difficulty===k?v.color:"#1e2f48"}`,background:newQ.difficulty===k?v.color+"16":"transparent",color:newQ.difficulty===k?v.color:"#3a4f6a",fontFamily:"'Rajdhani',sans-serif",fontWeight:700}}>
+                    <div style={{fontSize:12}}>{v.label}</div><div style={{fontSize:10,opacity:.6}}>{v.xp} XP</div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          <div style={{marginBottom:24}}>
-            <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>SCHWIERIGKEIT</div>
-            <div style={{display:"flex",gap:8}}>
-              {Object.entries(DIFF).map(([k,v])=>(
-                <button key={k} onClick={()=>setNewQ(q=>({...q,difficulty:k}))} style={{flex:1,padding:"12px 0",borderRadius:11,border:`1px solid ${newQ.difficulty===k?v.color:"#1e2f48"}`,background:newQ.difficulty===k?v.color+"16":"transparent",color:newQ.difficulty===k?v.color:"#3a4f6a",fontFamily:"'Rajdhani',sans-serif",fontWeight:700}}>
-                  <div style={{fontSize:12}}>{v.label}</div><div style={{fontSize:10,opacity:.6}}>{v.xp} XP</div>
-                </button>
-              ))}
-            </div>
+          {/* ── Fixed Footer Buttons ── */}
+          <div style={{padding:"12px 18px",paddingBottom:"max(20px,env(safe-area-inset-bottom,20px))",flexShrink:0,borderTop:"1px solid #0f1a2e",background:"#080d1c"}}>
+            <button onClick={doSaveQuest} disabled={!newQ.name.trim()} style={{width:"100%",padding:"15px",borderRadius:13,border:"none",background:newQ.name.trim()?"linear-gradient(135deg,#1d4ed8,#38bdf8)":"#111929",color:newQ.name.trim()?"#fff":"#2d3f55",fontFamily:"'Orbitron',monospace",fontSize:13,fontWeight:700,letterSpacing:2,boxShadow:newQ.name.trim()?"0 4px 24px rgba(56,189,248,.25)":"none",transition:"all .2s",marginBottom:8}}>
+              {editingId?'SPEICHERN':'QUEST HINZUFUEGEN'}
+            </button>
+            <button onClick={()=>{setShowAdd(false);setEditingId(null);}} style={{width:"100%",padding:"13px",borderRadius:13,border:"1px solid #1e2f48",background:"transparent",color:"#475569",fontFamily:"'Rajdhani',sans-serif",fontSize:14,fontWeight:700,marginBottom:editingId?8:0}}>
+              ABBRECHEN
+            </button>
+            {editingId&&<button onClick={()=>{doDelete(editingId);setShowAdd(false);setEditingId(null);}} style={{width:"100%",padding:"13px",borderRadius:13,border:"1px solid rgba(248,113,113,.3)",background:"rgba(248,113,113,.06)",color:"#f87171",fontFamily:"'Rajdhani',sans-serif",fontSize:14,fontWeight:700}}>
+              🗑 QUEST LOESCHEN
+            </button>}
           </div>
-          <button onClick={doSaveQuest} disabled={!newQ.name.trim()} style={{width:"100%",padding:"15px",borderRadius:13,border:"none",background:newQ.name.trim()?"linear-gradient(135deg,#1d4ed8,#38bdf8)":"#111929",color:newQ.name.trim()?"#fff":"#2d3f55",fontFamily:"'Orbitron',monospace",fontSize:13,fontWeight:700,letterSpacing:2,boxShadow:newQ.name.trim()?"0 4px 24px rgba(56,189,248,.25)":"none",transition:"all .2s",marginBottom:10}}>
-            {editingId?'SPEICHERN':'QUEST HINZUFUEGEN'}
-          </button>
-          <button onClick={()=>{setShowAdd(false);setEditingId(null);}} style={{width:"100%",padding:"14px",borderRadius:13,border:"1px solid #1e2f48",background:"transparent",color:"#475569",fontFamily:"'Rajdhani',sans-serif",fontSize:14,fontWeight:700,marginBottom:editingId?32:0}}>
-            ABBRECHEN
-          </button>
-          {editingId&&<button onClick={()=>{doDelete(editingId);setShowAdd(false);setEditingId(null);}} style={{width:"100%",padding:"14px",borderRadius:13,border:"1px solid rgba(248,113,113,.3)",background:"rgba(248,113,113,.06)",color:"#f87171",fontFamily:"'Rajdhani',sans-serif",fontSize:14,fontWeight:700}}>
-            🗑 QUEST LOESCHEN
-          </button>}
         </div>
       </div>}
     </div>
