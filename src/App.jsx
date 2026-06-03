@@ -14,25 +14,25 @@ const CATS = {
   sonstige: { label:"Sonstige", emoji:"📋",  color:"#94a3b8" },
 };
 const RANKS = [
-  { rank:"E",   title:"Awakened One",          min:1,   max:9,   color:"#94a3b8" },
-  { rank:"D",   title:"Shadow Hunter",          min:10,  max:24,  color:"#4ade80" },
-  { rank:"C",   title:"Elite Hunter",           min:25,  max:49,  color:"#38bdf8" },
-  { rank:"B",   title:"Master Hunter",          min:50,  max:74,  color:"#fbbf24" },
-  { rank:"A",   title:"Shadow Sovereign",       min:75,  max:99,  color:"#c084fc" },
-  { rank:"S",   title:"Monarch of Shadows",     min:100, max:149, color:"#f87171" },
-  { rank:"SS",  title:"Transcendent Hunter",    min:150, max:199, color:"#fb923c" },
-  { rank:"SSS", title:"Ruler of the Shadows",   min:200, max:299, color:"#e879f9" },
-  { rank:"NL",  title:"National Level Hunter",  min:300, max:499, color:"#67e8f9" },
-  { rank:"SM",  title:"Shadow Monarch",         min:500, max:Infinity, color:"#fde68a" },
+  { rank:"E",   title:"Awakened One",          min:1,   max:4,    color:"#94a3b8" },
+  { rank:"D",   title:"Shadow Hunter",          min:5,   max:9,    color:"#4ade80" },
+  { rank:"C",   title:"Elite Hunter",           min:10,  max:19,   color:"#38bdf8" },
+  { rank:"B",   title:"Master Hunter",          min:20,  max:34,   color:"#fbbf24" },
+  { rank:"A",   title:"Shadow Sovereign",       min:35,  max:54,   color:"#c084fc" },
+  { rank:"S",   title:"Monarch of Shadows",     min:55,  max:79,   color:"#f87171" },
+  { rank:"SS",  title:"Transcendent Hunter",    min:80,  max:99,   color:"#fb923c" },
+  { rank:"SSS", title:"Ruler of the Shadows",   min:100, max:149,  color:"#e879f9" },
+  { rank:"NL",  title:"National Level Hunter",  min:150, max:249,  color:"#67e8f9" },
+  { rank:"SM",  title:"Shadow Monarch",         min:250, max:9999, color:"#fde68a" },
 ];
 // Tiered achievements: levels array = [bronze, silver, gold] thresholds
 // Single-level achievements have no levels array
 const ACHIEVEMENTS = [
   // ── Single-level ──────────────────────────────────────────────────────────
   { id:"first_step",  emoji:"⚔️",  title:"First Step",    desc:"Erste Quest erledigt",         check: s=>s.total>=1 },
-  { id:"awakened",    emoji:"✨",  title:"Awakened",      desc:"Level 5 erreicht",             check: s=>s.level>=5 },
-  { id:"d_rank",      emoji:"🗡️",  title:"Shadow Hunter", desc:"D-Rank (Level 6)",             check: s=>s.level>=6 },
-  { id:"c_rank",      emoji:"🌟",  title:"Elite Hunter",  desc:"C-Rank (Level 16)",            check: s=>s.level>=16 },
+  { id:"awakened",    emoji:"✨",  title:"Awakened",      desc:"Level 4 erreicht",             check: s=>s.level>=4 },
+  { id:"d_rank",      emoji:"🗡️",  title:"Shadow Hunter", desc:"D-Rank (Level 5)",             check: s=>s.level>=5 },
+  { id:"c_rank",      emoji:"🌟",  title:"Elite Hunter",  desc:"C-Rank (Level 10)",            check: s=>s.level>=10 },
   { id:"once_done",   emoji:"✅",  title:"Completionist", desc:"Einmalig-Quest abgeschlossen", check: s=>s.onceDone>=1 },
   { id:"freeze_used", emoji:"❄️",  title:"Cool Head",     desc:"Streak-Freeze eingesetzt",     check: s=>s.usedFreeze },
   // ── Tiered (Bronze / Silber / Gold) ────────────────────────────────────────
@@ -191,8 +191,6 @@ export default function App() {
   const [reorderMode, setReorderMode] = useState(false);
   const [tplSort,     setTplSort]     = useState('manual');
   const [editingId,   setEditingId]   = useState(null);
-  const dragIdx = useRef(null);
-  const dragOver = useRef(null);
   const noteTimer = useRef(null);
 
   // Persist
@@ -341,20 +339,8 @@ export default function App() {
   }
   function doDelete(id){const nt=tpl.filter(t=>t.id!==id);setTpl(nt);saveAll(nt,comps,plr);}
 
-  function onDragStart(i){dragIdx.current=i;}
-  function onDragEnter(i){dragOver.current=i;}
-  function onDragEnd(){
-    const from=dragIdx.current,to=dragOver.current;
-    if(from===null||to===null||from===to){dragIdx.current=null;dragOver.current=null;return;}
-    const dailyTpl=tpl.filter(t=>t.frequency==="daily");
+  function doDelete(id){const nt=tpl.filter(t=>t.id!==id);setTpl(nt);saveAll(nt,comps,plr);}    const dailyTpl=tpl.filter(t=>t.frequency==="daily");
     const rest=tpl.filter(t=>t.frequency!=="daily");
-    const reordered=[...dailyTpl];
-    const [moved]=reordered.splice(from,1);reordered.splice(to,0,moved);
-    const nt=[...reordered,...rest];
-    setTpl(nt);saveAll(nt,comps,plr);
-    dragIdx.current=null;dragOver.current=null;
-  }
-
   function doExport(){
     const data=JSON.stringify({templates:tpl,completions:comps,player:plr},null,2);
     const blob=new Blob([data],{type:"application/json"});
@@ -605,19 +591,14 @@ export default function App() {
               }
             </div>
           </div>
-          {reorderMode&&<div style={{fontSize:10,color:"#334155",textAlign:"center",marginBottom:10,letterSpacing:.5}}>Quests per Drag & Drop sortieren</div>}
-          {dailyQ.length===0?<EmptyState/>:dailyQ.filter(t=>t.frequency==="daily").map((t,i)=>(
-            <div key={t.id}
-              draggable={reorderMode}
-              onDragStart={reorderMode?()=>onDragStart(i):undefined}
-              onDragEnter={reorderMode?()=>onDragEnter(i):undefined}
-              onDragEnd={reorderMode?onDragEnd:undefined}
-              onDragOver={reorderMode?e=>e.preventDefault():undefined}
-              style={{position:"relative",transition:"background .15s",borderRadius:14,background:reorderMode?"rgba(56,189,248,.03)":"transparent"}}>
-              {reorderMode&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:32,display:"flex",alignItems:"center",justifyContent:"center",zIndex:10,cursor:"grab"}}>
-                <div style={{display:"flex",flexDirection:"column",gap:4}}>{[0,1,2].map(j=><div key={j} style={{width:16,height:2,background:"#38bdf8",borderRadius:1,opacity:.5}}/>)}</div>
+          {reorderMode&&<div style={{fontSize:10,color:"#334155",textAlign:"center",marginBottom:10,letterSpacing:.5}}>Reihenfolge mit den Pfeilen anpassen</div>}
+          {dailyQ.length===0?<EmptyState/>:dailyQ.filter(t=>t.frequency==="daily").map((t,i,arr)=>(
+            <div key={t.id} style={{position:"relative",borderRadius:14,background:reorderMode?"rgba(56,189,248,.03)":"transparent",display:"flex",alignItems:"center",gap:6,marginBottom:reorderMode?6:0}}>
+              {reorderMode&&<div style={{display:"flex",flexDirection:"column",gap:3,flexShrink:0}}>
+                <button onClick={()=>{if(i===0)return;const o=[...tpl];const ai=o.findIndex(x=>x.id===arr[i-1].id),bi=o.findIndex(x=>x.id===t.id);[o[ai],o[bi]]=[o[bi],o[ai]];setTpl(o);saveAll(o,comps,plr);}} disabled={i===0} style={{background:i===0?"transparent":"rgba(56,189,248,.12)",border:`1px solid ${i===0?"#0d1628":"rgba(56,189,248,.3)"}`,color:i===0?"#1a2840":"#38bdf8",borderRadius:6,width:26,height:26,fontSize:13,lineHeight:1,cursor:i===0?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▲</button>
+                <button onClick={()=>{if(i===arr.length-1)return;const o=[...tpl];const ai=o.findIndex(x=>x.id===arr[i+1].id),bi=o.findIndex(x=>x.id===t.id);[o[ai],o[bi]]=[o[bi],o[ai]];setTpl(o);saveAll(o,comps,plr);}} disabled={i===arr.length-1} style={{background:i===arr.length-1?"transparent":"rgba(56,189,248,.12)",border:`1px solid ${i===arr.length-1?"#0d1628":"rgba(56,189,248,.3)"}`,color:i===arr.length-1?"#1a2840":"#38bdf8",borderRadius:6,width:26,height:26,fontSize:13,lineHeight:1,cursor:i===arr.length-1?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▼</button>
               </div>}
-              <div style={{paddingLeft:reorderMode?32:0}}>
+              <div style={{flex:1}}>
                 {t.repeatable?<RepeatRow t={t}/>:<NormalRow t={t} done={doneIds.has(t.id)} onToggle={()=>!reorderMode&&(doneIds.has(t.id)?doUndo(t.id):doComplete(t))}/>}
               </div>
             </div>
