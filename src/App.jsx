@@ -80,7 +80,7 @@ const INIT_TPL = [
   { id:"t4", name:"Waschmaschine",        category:"haushalt", difficulty:"normal", frequency:"daily",  repeatable:false, emoji:"👕" },
   { id:"t5", name:"Kita Rucksack packen", category:"familie",  difficulty:"easy",   frequency:"daily",  repeatable:false, emoji:"🎒" },
   { id:"t6", name:"Einkaufen",            category:"einkauf",  difficulty:"normal", frequency:"daily",  repeatable:false, emoji:"🛒" },
-  { id:"t7", name:"Wohnung aufräumen",    category:"haushalt", difficulty:"normal", frequency:"weekly", repeatable:false, emoji:"🧹" },
+  { id:"t7", name:"Wohnung aufräumen",    category:"haushalt", difficulty:"normal", frequency:"daily",  repeatable:false, emoji:"🧹", weekLimit:1 },
   { id:"t8", name:"Wickeln",              category:"familie",  difficulty:"easy",   frequency:"daily",  repeatable:true,  emoji:"🍼" },
 ];
 const DAYS_DE   = ["Mo","Di","Mi","Do","Fr","Sa","So"];
@@ -126,7 +126,7 @@ function weekStartFromOffset(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7
 function monDays(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);const year=ref.getFullYear(),month=ref.getMonth(),f=new Date(year,month,1),la=new Date(year,month+1,0),pad=(f.getDay()+6)%7,arr=Array(pad).fill(null);for(let d=1;d<=la.getDate();d++)arr.push(ld(new Date(year,month,d)));return arr;}
 function monLabel(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);return{month:ref.getMonth(),year:ref.getFullYear()};}
 function weekLabel(weekOffset=0){const days=weekDays(weekOffset);const start=new Date(days[0]+"T12:00"),end=new Date(days[6]+"T12:00");const fmt=d=>d.toLocaleDateString("de-DE",{day:"numeric",month:"short"});const d=new Date(days[0]+"T12:00");d.setHours(0,0,0,0);d.setDate(d.getDate()+4-(d.getDay()||7));const kw=Math.ceil((((d-new Date(d.getFullYear(),0,1))/86400000)+1)/7);return{label:`KW ${kw}: ${fmt(start)} - ${fmt(end)}`,kw};}
-function migTpl(arr){return arr.map(t=>({repeatable:false,activeDays:[],weekLimit:0,...t,frequency:t.frequency??(t.recurring?"daily":"daily")}));}
+function migTpl(arr){return arr.map(t=>({repeatable:false,activeDays:[],weekLimit:0,...t,frequency:t.frequency==="weekly"?"daily":t.frequency??(t.recurring?"daily":"daily"),weekLimit:t.frequency==="weekly"?Math.max(t.weekLimit||0,1):t.weekLimit||0}));}
 function mkPlayer(p={}){const base={name:"Tim",streak:0,lastDate:null,completedOnce:[],weeklyGoal:500,freezes:1,lastFreezeMonth:null,achievements:[],usedFreeze:false,...p};base.achievements=migAchs(base.achievements);return base;}
 
 // Returns consecutive days streak for a specific template up to (not including) today
@@ -230,7 +230,8 @@ export default function App() {
     }
     return true;
   }),[tpl,todayDow,comps,ws]);
-  const weeklyQ    =useMemo(()=>tpl.filter(t=>t.frequency==="weekly"),[tpl]);
+  const weeklyQ    =useMemo(()=>[]/*removed*/, []);// kept for safe ref cleanup
+  const [catFilter, setCatFilter] = useState(null); // null = all
   const onceQ      =useMemo(()=>tpl.filter(t=>t.frequency==="once"),[tpl]);
   const onceActive =useMemo(()=>onceQ.filter(t=>!(plr.completedOnce||[]).includes(t.id)),[onceQ,plr.completedOnce]);
   const doneIds    =useMemo(()=>new Set(todayC.map(c=>c.templateId)),[todayC]);
@@ -238,12 +239,12 @@ export default function App() {
   const repCnt     =useMemo(()=>{const m={};todayC.forEach(c=>{m[c.templateId]=(m[c.templateId]||0)+1;});return m;},[todayC]);
   const dailyDone  =dailyQ.filter(q=>q.repeatable?(repCnt[q.id]||0)>0:doneIds.has(q.id)).length;
   const dailyTotal =dailyQ.length;
-  const weeklyDone =weeklyQ.filter(q=>wkDoneIds.has(q.id)).length;
+  const weeklyDone =0;
   const onceDone   =onceQ.length-onceActive.length;
-  const totalDone  =dailyDone+weeklyDone+onceDone;
-  const totalQ     =dailyTotal+weeklyQ.length+onceQ.length;
+  const totalDone  =dailyDone+onceDone;
+  const totalQ     =dailyTotal+onceQ.length;
   const progress   =totalQ>0?Math.round((totalDone/totalQ)*100):0;
-  const allDone    =totalQ>0&&dailyDone===dailyTotal&&weeklyDone===weeklyQ.length&&onceActive.length===0;
+  const allDone    =totalQ>0&&dailyDone===dailyTotal&&onceActive.length===0;
   const wkDays     =useMemo(()=>weekDays(weekOffset),[weekOffset]);
   const wkLabel    =useMemo(()=>weekLabel(weekOffset),[weekOffset]);
   const weekData   =useMemo(()=>wkDays.map(d=>({date:d,xp:comps.filter(c=>c.date===d).reduce((s,c)=>s+c.earnedXp,0),list:comps.filter(c=>c.date===d)})),[comps,wkDays]);
@@ -291,8 +292,8 @@ export default function App() {
     afterComplete(nc,np);
   }
 
-  function doUndo(tid, weekly=false) {
-    const pool=weekly?comps.filter(c=>c.templateId===tid&&c.weekStart===ws):comps.filter(c=>c.templateId===tid&&c.date===today);
+  function doUndo(tid) {
+    const pool=comps.filter(c=>c.templateId===tid&&c.date===today);
     if(!pool.length)return;
     const nc=comps.filter(c=>c.id!==pool.at(-1).id);
     setComps(nc); saveAll(tpl,nc,plr);
@@ -370,7 +371,7 @@ export default function App() {
   }
 
   // ── Sub-Components ───────────────────────────────────────────────────────────
-  function NormalRow({t,done,onToggle,isWeekly=false}){
+  function NormalRow({t,done,onToggle}){
     const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,earned=(d.xp+bon)*(dblXp?2:1);
     const qStreak=questStreak(comps,t.id,today);
     return(<div className="tap" onClick={onToggle} style={{background:done?"rgba(12,17,30,.5)":"rgba(12,18,40,.95)",border:`1px solid ${done?"#0d1628":d.color+"38"}`,borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12,opacity:done?.48:1,boxShadow:done?"none":`0 2px 16px ${d.color}12`,transition:"all .18s"}}>
@@ -380,7 +381,6 @@ export default function App() {
         <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap",alignItems:"center"}}>
           <Tag color={(CATS[t.category]??CATS.sonstige).color} label={(CATS[t.category]??CATS.sonstige).label.toUpperCase()}/>
           <Tag color={d.color} label={d.label.toUpperCase()}/>
-          {isWeekly&&<Tag color="#c084fc" label="📅 WEEKLY"/>}
           {t.weekLimit>0&&<Tag color="#94a3b8" label={`${(comps.filter(c=>c.templateId===t.id&&c.weekStart===ws).length)}/${t.weekLimit}W`}/>}
           {qStreak>=2&&!done&&<span style={{fontSize:10,color:"#fbbf24",fontWeight:700}}>🔥{qStreak}</span>}
         </div>
@@ -563,11 +563,6 @@ export default function App() {
             <div style={{fontSize:24}}>🏆</div>
             <div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:700,color:"#38bdf8",letterSpacing:2,marginTop:5}}>ALL QUESTS COMPLETE!</div>
           </div>}
-          {weeklyQ.length>0&&<>
-            <SecHead label="WEEKLY CHALLENGES" color="#c084fc" count={`${weeklyDone}/${weeklyQ.length}`} sub={`Reset ${(()=>{const t=new Date(),o=(t.getDay()+6)%7,m=new Date(t);m.setDate(t.getDate()-o+7);return m.toLocaleDateString("de-DE",{weekday:"short",day:"numeric",month:"short"});})()}`} onAdd={()=>setShowAdd(true)} btnColor="#c084fc"/>
-            {weeklyQ.map(t=><NormalRow key={t.id} t={t} done={wkDoneIds.has(t.id)} onToggle={()=>wkDoneIds.has(t.id)?doUndo(t.id,true):doComplete(t)} isWeekly/>)}
-            <HR/>
-          </>}
           {onceActive.length>0&&<>
             <SecHead label="EINMALIG" color="#fb923c" count={`${onceDone}/${onceQ.length}`} sub="einmalig erledigen" onAdd={()=>setShowAdd(true)} btnColor="#fb923c"/>
             {onceActive.map(t=><OnceRow key={t.id} t={t}/>)}
@@ -591,8 +586,15 @@ export default function App() {
               }
             </div>
           </div>
+          {/* Category filter chips */}
+          {!reorderMode&&dailyQ.length>2&&(()=>{const usedCats=[...new Set(dailyQ.map(t=>t.category))];return usedCats.length>1?(
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:12}}>
+              <button onClick={()=>setCatFilter(null)} style={{padding:"5px 11px",borderRadius:20,fontSize:10,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",border:`1px solid ${catFilter===null?"#38bdf8":"#1e2f48"}`,background:catFilter===null?"rgba(56,189,248,.15)":"transparent",color:catFilter===null?"#38bdf8":"#3a4f6a",letterSpacing:.5}}>ALLE</button>
+              {usedCats.map(k=>{const c=CATS[k]??CATS.sonstige;return(<button key={k} onClick={()=>setCatFilter(f=>f===k?null:k)} style={{padding:"5px 11px",borderRadius:20,fontSize:10,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",border:`1px solid ${catFilter===k?c.color:"#1e2f48"}`,background:catFilter===k?c.color+"20":"transparent",color:catFilter===k?c.color:"#3a4f6a",letterSpacing:.5}}>{c.emoji} {c.label}</button>);})}
+            </div>
+          ):null;})()}
           {reorderMode&&<div style={{fontSize:10,color:"#334155",textAlign:"center",marginBottom:10,letterSpacing:.5}}>Reihenfolge mit den Pfeilen anpassen</div>}
-          {dailyQ.length===0?<EmptyState/>:dailyQ.filter(t=>t.frequency==="daily").map((t,i,arr)=>(
+          {dailyQ.length===0?<EmptyState/>:dailyQ.filter(t=>t.frequency==="daily"&&(!catFilter||t.category===catFilter)).map((t,i,arr)=>(
             <div key={t.id} style={{position:"relative",borderRadius:14,background:reorderMode?"rgba(56,189,248,.03)":"transparent",display:"flex",alignItems:"center",gap:6,marginBottom:reorderMode?6:0}}>
               {reorderMode&&<div style={{display:"flex",flexDirection:"column",gap:3,flexShrink:0}}>
                 <button onClick={()=>{if(i===0)return;const o=[...tpl];const ai=o.findIndex(x=>x.id===arr[i-1].id),bi=o.findIndex(x=>x.id===t.id);[o[ai],o[bi]]=[o[bi],o[ai]];setTpl(o);saveAll(o,comps,plr);}} disabled={i===0} style={{background:i===0?"transparent":"rgba(56,189,248,.12)",border:`1px solid ${i===0?"#0d1628":"rgba(56,189,248,.3)"}`,color:i===0?"#1a2840":"#38bdf8",borderRadius:6,width:26,height:26,fontSize:13,lineHeight:1,cursor:i===0?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▲</button>
@@ -719,7 +721,7 @@ export default function App() {
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
             <div>
               <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#38bdf8",letterSpacing:2}}>TEMPLATES</div>
-              <div style={{fontSize:11,color:"#2d3f55",marginTop:3}}>{dailyQ.length} daily · {weeklyQ.length} weekly · {onceQ.length} einmalig</div>
+              <div style={{fontSize:11,color:"#2d3f55",marginTop:3}}>{dailyQ.length} daily · {onceQ.length} einmalig</div>
             </div>
             <div style={{display:"flex",gap:7}}>
               <button onClick={()=>setTplSort(s=>s==='alpha'?'manual':'alpha')} style={{background:tplSort==='alpha'?"rgba(56,189,248,.15)":"rgba(71,85,105,.1)",border:"1px solid rgba(56,189,248,.3)",color:tplSort==='alpha'?"#38bdf8":"#64748b",borderRadius:9,padding:"8px 10px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif"}}>A-Z</button>
@@ -732,10 +734,6 @@ export default function App() {
             {(tplSort==='alpha'?[...dailyQ].sort((a,b)=>a.name.localeCompare(b.name)):dailyQ).map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(
               <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} onEdit={()=>openEdit(t)} extra={t.repeatable&&<Tag color="#fbbf24" label="🔁 REPEAT"/>}/>
             );})}
-          </>}
-          {weeklyQ.length>0&&<>
-            <div style={{fontSize:9,color:"#c084fc",letterSpacing:2,fontWeight:700,margin:"16px 0 10px",fontFamily:"'Orbitron',monospace"}}>📅 WEEKLY</div>
-            {(tplSort==='alpha'?[...weeklyQ].sort((a,b)=>a.name.localeCompare(b.name)):weeklyQ).map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(<TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} onEdit={()=>openEdit(t)}/>);})}
           </>}
           {onceQ.length>0&&<>
             <div style={{fontSize:9,color:"#fb923c",letterSpacing:2,fontWeight:700,margin:"16px 0 10px",fontFamily:"'Orbitron',monospace"}}>✅ EINMALIG</div>
@@ -899,7 +897,7 @@ export default function App() {
             <div style={{marginBottom:newQ.frequency==="daily"?10:16}}>
               <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>HÄUFIGKEIT</div>
               <div style={{display:"flex",gap:8}}>
-                {[{k:"daily",l:"🔄",sub:"TÄGLICH",c:"#38bdf8"},{k:"weekly",l:"📅",sub:"WÖCHENTLICH",c:"#c084fc"},{k:"once",l:"✅",sub:"EINMALIG",c:"#fb923c"}].map(({k,l,sub,c})=>(
+                {[{k:"daily",l:"🔄",sub:"TÄGLICH",c:"#38bdf8"},{k:"once",l:"✅",sub:"EINMALIG",c:"#fb923c"}].map(({k,l,sub,c})=>(
                   <button key={k} onClick={()=>setNewQ(q=>({...q,frequency:k,repeatable:k==="daily"?q.repeatable:false}))} style={{flex:1,padding:"12px 4px",borderRadius:11,border:`1px solid ${newQ.frequency===k?c:"#1e2f48"}`,background:newQ.frequency===k?c+"16":"transparent",color:newQ.frequency===k?c:"#3a4f6a",fontFamily:"'Rajdhani',sans-serif",fontWeight:700}}>
                     <div style={{fontSize:18}}>{l}</div><div style={{fontSize:10,marginTop:2}}>{sub}</div>
                   </button>
