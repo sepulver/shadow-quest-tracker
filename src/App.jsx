@@ -130,17 +130,28 @@ function migTpl(arr){return arr.map(t=>({repeatable:false,activeDays:[],weekLimi
 function mkPlayer(p={}){const base={name:"Tim",streak:0,lastDate:null,completedOnce:[],weeklyGoal:500,freezes:1,lastFreezeMonth:null,achievements:[],usedFreeze:false,...p};base.achievements=migAchs(base.achievements);return base;}
 
 // Returns consecutive days streak for a specific template up to (not including) today
-function questStreak(comps, templateId, today) {
+function questStreak(comps, templateId, today, template) {
   const days = new Set(comps.filter(c=>c.templateId===templateId).map(c=>c.date));
+  const activeDays = template?.activeDays; // 0=Mo,1=Di,...,6=So
+  const hasActiveDays = activeDays && activeDays.length > 0;
   let streak = 0;
   let d = new Date(today + 'T12:00');
-  d.setDate(d.getDate() - 1); // start from yesterday
+  // include today if already done
   while(true) {
+    const dow = (d.getDay()+6)%7; // 0=Mo..6=So
     const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    // skip days this quest wasn't scheduled
+    if(hasActiveDays && !activeDays.includes(dow)){
+      d.setDate(d.getDate()-1);
+      if(streak===0&&d<new Date(today+'T12:00')){break;} // don't loop forever if today not scheduled
+      // safety: don't go back more than 365 days
+      if(new Date(today+'T12:00')-d > 365*86400000) break;
+      continue;
+    }
     if(!days.has(key)) break;
     streak++;
-    d.setDate(d.getDate() - 1);
-    if(streak > 365) break; // safety
+    d.setDate(d.getDate()-1);
+    if(streak>365) break;
   }
   return streak;
 }
@@ -373,7 +384,7 @@ export default function App() {
   // ── Sub-Components ───────────────────────────────────────────────────────────
   function NormalRow({t,done,onToggle}){
     const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,earned=(d.xp+bon)*(dblXp?2:1);
-    const qStreak=questStreak(comps,t.id,today);
+    const qStreak=questStreak(comps,t.id,today,t);
     return(<div className="tap" onClick={onToggle} style={{background:done?"rgba(12,17,30,.5)":"rgba(12,18,40,.95)",border:`1px solid ${done?"#0d1628":d.color+"38"}`,borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12,opacity:done?.48:1,boxShadow:done?"none":`0 2px 16px ${d.color}12`,transition:"all .18s"}}>
       <div style={{fontSize:25,minWidth:40,textAlign:"center"}}>{t.emoji}</div>
       <div style={{flex:1,minWidth:0}}>
@@ -382,7 +393,7 @@ export default function App() {
           <Tag color={(CATS[t.category]??CATS.sonstige).color} label={(CATS[t.category]??CATS.sonstige).label.toUpperCase()}/>
           <Tag color={d.color} label={d.label.toUpperCase()}/>
           {t.weekLimit>0&&<Tag color="#94a3b8" label={`${(comps.filter(c=>c.templateId===t.id&&c.weekStart===ws).length)}/${t.weekLimit}W`}/>}
-          {qStreak>=2&&!done&&<span style={{fontSize:10,color:"#fbbf24",fontWeight:700}}>🔥{qStreak}</span>}
+          {qStreak>=2&&<span style={{fontSize:10,color:"#fbbf24",fontWeight:700}}>🔥{qStreak}</span>}
         </div>
       </div>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,minWidth:52}}>
@@ -394,7 +405,7 @@ export default function App() {
 
   function RepeatRow({t}){
     const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,count=repCnt[t.id]||0,earned=(d.xp+bon)*(dblXp?2:1);
-    const qStreak=questStreak(comps,t.id,today);
+    const qStreak=questStreak(comps,t.id,today,t);
     return(<div style={{background:"rgba(12,18,40,.95)",border:`1px solid ${d.color}38`,borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12,boxShadow:`0 2px 16px ${d.color}12`}}>
       <div style={{fontSize:25,minWidth:40,textAlign:"center"}}>{t.emoji}</div>
       <div style={{flex:1,minWidth:0}}>
