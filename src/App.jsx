@@ -30,9 +30,19 @@ const RANKS = [
 const ACHIEVEMENTS = [
   // ── Single-level ──────────────────────────────────────────────────────────
   { id:"first_step",  emoji:"⚔️",  title:"First Step",    desc:"Erste Quest erledigt",         check: s=>s.total>=1 },
-  { id:"awakened",    emoji:"✨",  title:"Awakened",      desc:"Level 4 erreicht",             check: s=>s.level>=4 },
-  { id:"d_rank",      emoji:"🗡️",  title:"Shadow Hunter", desc:"D-Rank (Level 5)",             check: s=>s.level>=5 },
-  { id:"c_rank",      emoji:"🌟",  title:"Elite Hunter",  desc:"C-Rank (Level 10)",            check: s=>s.level>=10 },
+  { id:"awakened",    emoji:"✨",  title:"Awakened",           desc:"Level 4 erreicht",             check: s=>s.level>=4 },
+  { id:"d_rank",      emoji:"🗡️",  title:"Shadow Hunter",      desc:"D-Rank (Level 5)",             check: s=>s.level>=5 },
+  { id:"c_rank",      emoji:"🌟",  title:"Elite Hunter",       desc:"C-Rank (Level 10)",            check: s=>s.level>=10 },
+  { id:"b_rank",      emoji:"⚔️",  title:"Master Hunter",      desc:"B-Rank (Level 20)",            check: s=>s.level>=20 },
+  { id:"lv25",        emoji:"🔷",  title:"Level 25",           desc:"Level 25 erreicht",            check: s=>s.level>=25 },
+  { id:"a_rank",      emoji:"👑",  title:"Shadow Sovereign",   desc:"A-Rank (Level 35)",            check: s=>s.level>=35 },
+  { id:"lv50",        emoji:"🔶",  title:"Level 50",           desc:"Level 50 erreicht",            check: s=>s.level>=50 },
+  { id:"s_rank",      emoji:"💀",  title:"Monarch of Shadows", desc:"S-Rank (Level 55)",            check: s=>s.level>=55 },
+  { id:"lv75",        emoji:"💎",  title:"Level 75",           desc:"Level 75 erreicht",            check: s=>s.level>=75 },
+  { id:"ss_rank",     emoji:"🌑",  title:"Transcendent",       desc:"SS-Rank (Level 80)",           check: s=>s.level>=80 },
+  { id:"sss_rank",    emoji:"🔱",  title:"Ruler of Shadows",   desc:"SSS-Rank (Level 100)",         check: s=>s.level>=100 },
+  { id:"nl_rank",     emoji:"🌌",  title:"National Level",     desc:"NL-Rank (Level 150)",          check: s=>s.level>=150 },
+  { id:"sm_rank",     emoji:"🩸",  title:"Shadow Monarch",     desc:"Shadow Monarch (Level 250)",   check: s=>s.level>=250 },
   { id:"once_done",   emoji:"✅",  title:"Completionist", desc:"Einmalig-Quest abgeschlossen", check: s=>s.onceDone>=1 },
   { id:"freeze_used", emoji:"❄️",  title:"Cool Head",     desc:"Streak-Freeze eingesetzt",     check: s=>s.usedFreeze },
   // ── Tiered (Bronze / Silber / Gold) ────────────────────────────────────────
