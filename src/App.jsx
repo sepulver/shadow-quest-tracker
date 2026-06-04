@@ -97,6 +97,67 @@ const DAYS_DE   = ["Mo","Di","Mi","Do","Fr","Sa","So"];
 const MONTHS_DE = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
 const STORE_KEY = "sqt"; // permanent - never change this
 
+// ─── Daily Quotes ─────────────────────────────────────────────────────────────
+const QUOTES = [
+  // ── Solo Leveling ──────────────────────────────────────────────────────────
+  { text: "I alone am the exception.", source: "Sung Jinwoo · Solo Leveling" },
+  { text: "The difference between the strong and the weak is the will to keep moving forward.", source: "Sung Jinwoo · Solo Leveling" },
+  { text: "Arise.", source: "System · Solo Leveling" },
+  { text: "If I run now, I'll be running for the rest of my life.", source: "Sung Jinwoo · Solo Leveling" },
+  { text: "A true hunter never panics in the face of the unknown.", source: "Go Gunhee · Solo Leveling" },
+  { text: "The weak have no right to determine how the strong should live.", source: "Antares · Solo Leveling" },
+  { text: "There is no shame in acknowledging one's weakness. The shame lies in refusing to overcome it.", source: "Sung Jinwoo · Solo Leveling" },
+  { text: "I didn't come this far to only come this far.", source: "Sung Jinwoo · Solo Leveling" },
+  { text: "Those who cannot acknowledge themselves will eventually fail.", source: "System · Solo Leveling" },
+  { text: "My purpose is not to be the strongest. My purpose is to protect those I love.", source: "Sung Jinwoo · Solo Leveling" },
+  // ── Naruto ─────────────────────────────────────────────────────────────────
+  { text: "Hard work is worthless for those that don't believe in themselves.", source: "Naruto Uzumaki · Naruto" },
+  { text: "If you don't like your destiny, don't accept it. Instead have the courage to change it.", source: "Naruto Uzumaki · Naruto" },
+  { text: "The pain of being alone is completely out of this world, isn't it?", source: "Gaara · Naruto" },
+  { text: "A dropout will beat a genius through hard work.", source: "Rock Lee · Naruto" },
+  { text: "The true measure of a shinobi is not how he lives, but how he dies.", source: "Jiraiya · Naruto" },
+  // ── Attack on Titan ────────────────────────────────────────────────────────
+  { text: "If you win, you live. If you lose, you die. If you don't fight, you can't win.", source: "Eren Yeager · Attack on Titan" },
+  { text: "No matter what, I'll keep moving forward until my enemies are destroyed.", source: "Eren Yeager · Attack on Titan" },
+  { text: "Someone who can't sacrifice anything can never change anything.", source: "Armin Arlert · Attack on Titan" },
+  { text: "Dedicate your hearts.", source: "Erwin Smith · Attack on Titan" },
+  // ── Hunter x Hunter ────────────────────────────────────────────────────────
+  { text: "You should enjoy the little detours in life. That's where you'll find the things that are more important than what you want.", source: "Ging Freecs · Hunter x Hunter" },
+  { text: "If you want to get to know someone, find out what makes them angry.", source: "Gon Freecs · Hunter x Hunter" },
+  { text: "People only find me interesting because they can't tell whether I'm serious or not.", source: "Hisoka · Hunter x Hunter" },
+  // ── Dragon Ball ────────────────────────────────────────────────────────────
+  { text: "Power comes in response to a need, not a desire. You have to create that need.", source: "Goku · Dragon Ball Z" },
+  { text: "It's not about how hard you hit. It's about how hard you can get hit and keep moving forward.", source: "Vegeta · Dragon Ball Z" },
+  { text: "Surpass your limits. Right here, right now.", source: "Vegeta · Dragon Ball Z" },
+  // ── Demon Slayer ───────────────────────────────────────────────────────────
+  { text: "No matter how many people you may lose, you have no choice but to go on living.", source: "Tanjiro Kamado · Demon Slayer" },
+  { text: "Set your heart ablaze.", source: "Flame Hashira Rengoku · Demon Slayer" },
+  { text: "A sword is only as strong as the will of the one who wields it.", source: "Tanjiro Kamado · Demon Slayer" },
+  // ── One Piece ──────────────────────────────────────────────────────────────
+  { text: "Bring on the hardship. It's preferred in a path of carnage.", source: "Roronoa Zoro · One Piece" },
+  { text: "Only those who have suffered long can see the light within the shadows.", source: "Roronoa Zoro · One Piece" },
+  { text: "I don't want to conquer anything. I just think the guy with the most freedom in this whole ocean... that's the Pirate King!", source: "Monkey D. Luffy · One Piece" },
+  // ── Jujutsu Kaisen ─────────────────────────────────────────────────────────
+  { text: "No matter what, don't regret choosing to fight.", source: "Yuji Itadori · Jujutsu Kaisen" },
+  { text: "Looking away never makes the pain go away.", source: "Satoru Gojo · Jujutsu Kaisen" },
+  { text: "Technique alone is not enough to win a fight. What you need is the will to overcome your enemy.", source: "Satoru Gojo · Jujutsu Kaisen" },
+  // ── Motivational (real) ────────────────────────────────────────────────────
+  { text: "We are what we repeatedly do. Excellence, then, is not an act, but a habit.", source: "Aristotle" },
+  { text: "The secret of getting ahead is getting started.", source: "Mark Twain" },
+  { text: "Do something today that your future self will thank you for.", source: "Sean Patrick Flanery" },
+  { text: "Small daily improvements are the key to staggering long-term results.", source: "Robin Sharma" },
+  { text: "Discipline is choosing between what you want now and what you want most.", source: "Abraham Lincoln" },
+  { text: "It always seems impossible until it's done.", source: "Nelson Mandela" },
+  { text: "You don't rise to the level of your goals. You fall to the level of your systems.", source: "James Clear · Atomic Habits" },
+];
+
+function getDailyQuote(dateStr) {
+  let h = 0;
+  for (let i = 0; i < dateStr.length; i++) h = (h * 31 + dateStr.charCodeAt(i)) >>> 0;
+  return QUOTES[h % QUOTES.length];
+}
+
+
 // ─── Storage ──────────────────────────────────────────────────────────────────
 function loadAll() {
   // Try current key first, then migrate from old versioned keys
@@ -579,7 +640,16 @@ export default function App() {
                 <div style={{fontSize:9,color:"#3a4f6a",letterSpacing:.5,marginTop:2}}>{l}</div>
               </div>
             ))}
-          </div>
+
+          {(()=>{const q=getDailyQuote(today);return(
+            <div style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:16,padding:"12px 14px",background:"rgba(56,189,248,.04)",borderRadius:12,border:"1px solid rgba(56,189,248,.1)"}}>
+              <div style={{width:3,minHeight:36,borderRadius:2,background:"linear-gradient(180deg,#38bdf8,#c084fc)",flexShrink:0,marginTop:2}}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,color:"#94a3b8",fontStyle:"italic",lineHeight:1.5,fontWeight:600}}>&ldquo;{q.text}&rdquo;</div>
+                <div style={{fontSize:10,color:"#38bdf8",marginTop:6,letterSpacing:.5,fontWeight:700,opacity:.75}}>— {q.source}</div>
+              </div>
+            </div>
+          );})()}
           {allDone&&<div style={{background:"linear-gradient(135deg,rgba(56,189,248,.1),rgba(192,132,252,.1))",border:"1px solid rgba(56,189,248,.38)",borderRadius:14,padding:"14px 18px",marginBottom:18,textAlign:"center",animation:"slideUp .4s ease"}}>
             <div style={{fontSize:24}}>🏆</div>
             <div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:700,color:"#38bdf8",letterSpacing:2,marginTop:5}}>ALL QUESTS COMPLETE!</div>
