@@ -640,7 +640,7 @@ export default function App() {
                 <div style={{fontSize:9,color:"#3a4f6a",letterSpacing:.5,marginTop:2}}>{l}</div>
               </div>
             ))}
-
+          </div>
           {(()=>{const q=getDailyQuote(today);return(
             <div style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:16,padding:"12px 14px",background:"rgba(56,189,248,.04)",borderRadius:12,border:"1px solid rgba(56,189,248,.1)"}}>
               <div style={{width:3,minHeight:36,borderRadius:2,background:"linear-gradient(180deg,#38bdf8,#c084fc)",flexShrink:0,marginTop:2}}/>
