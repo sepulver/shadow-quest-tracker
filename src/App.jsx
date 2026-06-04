@@ -197,7 +197,7 @@ function weekStartFromOffset(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7
 function monDays(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);const year=ref.getFullYear(),month=ref.getMonth(),f=new Date(year,month,1),la=new Date(year,month+1,0),pad=(f.getDay()+6)%7,arr=Array(pad).fill(null);for(let d=1;d<=la.getDate();d++)arr.push(ld(new Date(year,month,d)));return arr;}
 function monLabel(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);return{month:ref.getMonth(),year:ref.getFullYear()};}
 function weekLabel(weekOffset=0){const days=weekDays(weekOffset);const start=new Date(days[0]+"T12:00"),end=new Date(days[6]+"T12:00");const fmt=d=>d.toLocaleDateString("de-DE",{day:"numeric",month:"short"});const d=new Date(days[0]+"T12:00");d.setHours(0,0,0,0);d.setDate(d.getDate()+4-(d.getDay()||7));const kw=Math.ceil((((d-new Date(d.getFullYear(),0,1))/86400000)+1)/7);return{label:`KW ${kw}: ${fmt(start)} - ${fmt(end)}`,kw};}
-function migTpl(arr){return arr.map(t=>({repeatable:false,activeDays:[],weekLimit:0,...t,frequency:t.frequency==="weekly"?"daily":t.frequency??(t.recurring?"daily":"daily"),weekLimit:t.frequency==="weekly"?Math.max(t.weekLimit||0,1):t.weekLimit||0}));}
+function migTpl(arr){return arr.map((t,i)=>({repeatable:false,activeDays:[],weekLimit:0,...t,frequency:t.frequency==="weekly"?"daily":t.frequency??(t.recurring?"daily":"daily"),weekLimit:t.frequency==="weekly"?Math.max(t.weekLimit||0,1):t.weekLimit||0,order:t.order??i}));}
 function mkPlayer(p={}){const base={name:"Tim",streak:0,lastDate:null,completedOnce:[],weeklyGoal:500,freezes:1,lastFreezeMonth:null,achievements:[],usedFreeze:false,...p};base.achievements=migAchs(base.achievements);return base;}
 
 // Returns consecutive days streak for a specific template up to (not including) today
@@ -414,7 +414,7 @@ export default function App() {
       const nt=tpl.map(t=>t.id===editingId?{...t,...newQ,name:newQ.name.trim()}:t);
       setTpl(nt); saveAll(nt,comps,plr);
     } else {
-      const id='t'+Date.now(),t={...newQ,id,name:newQ.name.trim()};
+      const id='t'+Date.now(),t={...newQ,id,name:newQ.name.trim(),order:Date.now()};
       const nt=[...tpl,t]; setTpl(nt); saveAll(nt,comps,plr);
     }
     setNewQ({...EMPTY_Q});
@@ -422,8 +422,6 @@ export default function App() {
   }
   function doDelete(id){const nt=tpl.filter(t=>t.id!==id);setTpl(nt);saveAll(nt,comps,plr);}
 
-  function doDelete(id){const nt=tpl.filter(t=>t.id!==id);setTpl(nt);saveAll(nt,comps,plr);}    const dailyTpl=tpl.filter(t=>t.frequency==="daily");
-    const rest=tpl.filter(t=>t.frequency!=="daily");
   function doExport(){
     const data=JSON.stringify({templates:tpl,completions:comps,player:plr},null,2);
     const blob=new Blob([data],{type:"application/json"});
@@ -812,7 +810,7 @@ export default function App() {
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
             <div>
               <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#38bdf8",letterSpacing:2}}>TEMPLATES</div>
-              <div style={{fontSize:11,color:"#2d3f55",marginTop:3}}>{dailyQ.length} daily · {onceQ.length} einmalig</div>
+              <div style={{fontSize:11,color:"#2d3f55",marginTop:3}}>{tpl.filter(t=>t.frequency==="daily").length} daily · {onceQ.length} einmalig</div>
             </div>
             <div style={{display:"flex",gap:7}}>
               <button onClick={()=>setTplSort(s=>s==='alpha'?'manual':'alpha')} style={{background:tplSort==='alpha'?"rgba(56,189,248,.15)":"rgba(71,85,105,.1)",border:"1px solid rgba(56,189,248,.3)",color:tplSort==='alpha'?"#38bdf8":"#64748b",borderRadius:9,padding:"8px 10px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif"}}>A-Z</button>
@@ -820,9 +818,9 @@ export default function App() {
             </div>
           </div>
 
-          {dailyQ.length>0&&<>
+          {tpl.filter(t=>t.frequency==="daily").length>0&&<>
             <div style={{fontSize:9,color:"#38bdf8",letterSpacing:2,fontWeight:700,marginBottom:10,fontFamily:"'Orbitron',monospace"}}>⚔️ DAILY</div>
-            {(tplSort==='alpha'?[...dailyQ].sort((a,b)=>a.name.localeCompare(b.name)):dailyQ).map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(
+            {(tplSort==='alpha'?[...tpl.filter(t=>t.frequency==="daily")].sort((a,b)=>a.name.localeCompare(b.name)):[...tpl.filter(t=>t.frequency==="daily")].sort((a,b)=>(a.order??0)-(b.order??0))).map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(
               <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} onEdit={()=>openEdit(t)} extra={t.repeatable&&<Tag color="#fbbf24" label="🔁 REPEAT"/>}/>
             );})}
           </>}
