@@ -820,22 +820,162 @@ export default function App() {
           <div style={{marginBottom:24}}>
             <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#38bdf8",letterSpacing:2,marginBottom:12}}>STATISTIKEN</div>
             {(()=>{
-              const topCatEntry=Object.entries(Object.fromEntries(Object.keys(CATS).map(k=>[k,comps.filter(c=>c.category===k).length]))).sort((a,b)=>b[1]-a[1])[0];
               const activeDaysTotal=new Set(comps.map(c=>c.date)).size;
               const avgXP=activeDaysTotal>0?Math.round(totalXP/activeDaysTotal):0;
+              const daysSinceFirst=comps.length>0?Math.max(1,Math.round((new Date(today)-new Date(comps.reduce((a,b)=>a.date<b.date?a:b).date+"T12:00"))/(86400000))+1):0;
+              const consistencyPct=daysSinceFirst>0?Math.round((activeDaysTotal/daysSinceFirst)*100):0;
               return(
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
                   {[
                     {l:"Gesamt Quests",v:comps.length,c:"#38bdf8"},
                     {l:"Gesamt XP",v:totalXP.toLocaleString(),c:"#c084fc"},
                     {l:"Ø XP / Aktivtag",v:avgXP,c:"#4ade80"},
-                    {l:"Top Kategorie",v:topCatEntry&&topCatEntry[1]>0?`${CATS[topCatEntry[0]]?.emoji} ${CATS[topCatEntry[0]]?.label}`:"-",c:"#fbbf24"},
-                  ].map(({l,v,c})=>(
+                    {l:"Konsistenz",v:consistencyPct+"%",c:"#fbbf24",sub:`${activeDaysTotal} von ${daysSinceFirst} Tagen`},
+                  ].map(({l,v,c,sub})=>(
                     <div key={l} style={{background:`${c}09`,border:`1px solid ${c}22`,borderRadius:12,padding:"12px 14px"}}>
                       <div style={{fontFamily:"'Orbitron',monospace",fontSize:17,fontWeight:900,color:c}}>{v}</div>
                       <div style={{fontSize:11,color:"#475569",marginTop:4}}>{l}</div>
+                      {sub&&<div style={{fontSize:9,color:"#334155",marginTop:2}}>{sub}</div>}
                     </div>
                   ))}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* 30-Day XP Chart */}
+          <div style={{marginBottom:24}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#c084fc",letterSpacing:2,marginBottom:12}}>XP VERLAUF — 30 TAGE</div>
+            {(()=>{
+              const days30=Array.from({length:30},(_,i)=>{const d=new Date(today+"T12:00");d.setDate(d.getDate()-(29-i));return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");});
+              const xpByDay=days30.map(d=>comps.filter(c=>c.date===d).reduce((s,c)=>s+c.earnedXp,0));
+              const maxXP=Math.max(...xpByDay,1);
+              const barW=Math.floor((Math.min(440,window.innerWidth-36)-29*2)/30);
+              return(
+                <div style={{background:"rgba(12,18,40,.8)",border:"1px solid #1a2840",borderRadius:14,padding:"14px 12px 10px"}}>
+                  <div style={{display:"flex",alignItems:"flex-end",gap:2,height:60}}>
+                    {xpByDay.map((xp,i)=>{
+                      const h=xp>0?Math.max(4,Math.round((xp/maxXP)*56)):2;
+                      const isToday=i===29;
+                      const dow=new Date(days30[i]+"T12:00").getDay();
+                      const isWeekend=dow===0||dow===6;
+                      return(
+                        <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-end",height:60}}>
+                          <div style={{width:"100%",height:h,borderRadius:"3px 3px 0 0",background:isToday?"#38bdf8":xp>0?isWeekend?"#6366f1":"#c084fc":"#0f1628",transition:"height .3s",minHeight:2}}/>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
+                    {[0,14,29].map(i=><div key={i} style={{fontSize:9,color:"#334155"}}>{new Date(days30[i]+"T12:00").toLocaleDateString("de-DE",{day:"numeric",month:"short"})}</div>)}
+                  </div>
+                  <div style={{display:"flex",gap:12,marginTop:8}}>
+                    {[{c:"#c084fc",l:"Werktag"},{c:"#6366f1",l:"Wochenende"},{c:"#38bdf8",l:"Heute"}].map(({c,l})=>(
+                      <div key={l} style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:2,background:c}}/><div style={{fontSize:9,color:"#475569"}}>{l}</div></div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Weekday Heatmap */}
+          <div style={{marginBottom:24}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#4ade80",letterSpacing:2,marginBottom:12}}>AKTIVSTE WOCHENTAGE</div>
+            {(()=>{
+              const labels=["Mo","Di","Mi","Do","Fr","Sa","So"];
+              const counts=Array(7).fill(0);
+              const xpSum=Array(7).fill(0);
+              comps.forEach(c=>{const dow=(new Date(c.date+"T12:00").getDay()+6)%7;counts[dow]++;xpSum[dow]+=c.earnedXp;});
+              const maxC=Math.max(...counts,1);
+              return(
+                <div style={{background:"rgba(12,18,40,.8)",border:"1px solid #1a2840",borderRadius:14,padding:"14px"}}>
+                  <div style={{display:"flex",gap:6}}>
+                    {labels.map((l,i)=>{
+                      const pct=counts[i]/maxC;
+                      const isWeekend=i>=5;
+                      const color=isWeekend?"#6366f1":"#4ade80";
+                      return(
+                        <div key={l} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+                          <div style={{fontSize:9,color:"#475569",fontWeight:700}}>{l}</div>
+                          <div style={{width:"100%",height:80,background:"#0a1020",borderRadius:8,display:"flex",alignItems:"flex-end",overflow:"hidden"}}>
+                            <div style={{width:"100%",height:`${Math.max(4,pct*100)}%`,background:pct>0.8?color:pct>0.5?color+"bb":pct>0.2?color+"66":"#1a2840",borderRadius:"6px 6px 0 0",transition:"height .3s"}}/>
+                          </div>
+                          <div style={{fontSize:9,color:counts[i]>0?"#94a3b8":"#334155",fontWeight:700}}>{counts[i]}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Category Breakdown */}
+          <div style={{marginBottom:24}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#fbbf24",letterSpacing:2,marginBottom:12}}>KATEGORIEN</div>
+            {(()=>{
+              const total=comps.length||1;
+              const cats=Object.entries(CATS).map(([k,v])=>({k,v,n:comps.filter(c=>c.category===k).length})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
+              if(cats.length===0)return<div style={{fontSize:11,color:"#334155",textAlign:"center",padding:16}}>Noch keine Daten</div>;
+              return(
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {cats.map(({k,v,n})=>{
+                    const pct=Math.round((n/total)*100);
+                    return(
+                      <div key={k}>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                          <div style={{fontSize:12,fontWeight:700,color:"#94a3b8"}}>{v.emoji} {v.label}</div>
+                          <div style={{fontSize:12,color:v.color,fontWeight:700,fontFamily:"'Orbitron',monospace"}}>{n} <span style={{color:"#334155",fontSize:10}}>({pct}%)</span></div>
+                        </div>
+                        <div style={{height:6,background:"#0a1020",borderRadius:3,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:pct+"%",background:v.color,borderRadius:3,transition:"width .4s ease"}}/>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Per-Quest Stats */}
+          <div style={{marginBottom:24}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#f87171",letterSpacing:2,marginBottom:12}}>QUEST DETAILS</div>
+            {(()=>{
+              if(tpl.filter(t=>t.frequency==="daily").length===0)return<div style={{fontSize:11,color:"#334155",textAlign:"center",padding:16}}>Keine Daily Quests</div>;
+              return(
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {tpl.filter(t=>t.frequency==="daily").map(t=>{
+                    const tc=comps.filter(c=>c.templateId===t.id);
+                    const totalC=tc.length;
+                    const qXP=tc.reduce((s,c)=>s+c.earnedXp,0);
+                    const qs=questStreak(comps,t.id,today,t);
+                    const d=DIFF[t.difficulty];
+                    const activeDaysCount=new Set(comps.map(c=>c.date)).size||1;
+                    const ratePct=activeDaysCount>0?Math.min(100,Math.round((totalC/activeDaysCount)*100)):0;
+                    return(
+                      <div key={t.id} style={{background:"rgba(12,18,40,.8)",border:"1px solid #1a2840",borderRadius:12,padding:"12px 14px"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <div style={{fontSize:20}}>{t.emoji}</div>
+                            <div>
+                              <div style={{fontSize:13,fontWeight:700,color:"#e2e8f0"}}>{t.name}</div>
+                              <div style={{fontSize:10,color:"#475569",marginTop:1}}>{totalC}× erledigt · {qXP.toLocaleString()} XP</div>
+                            </div>
+                          </div>
+                          {qs>=2&&<div style={{fontSize:11,color:"#fbbf24",fontWeight:700,flexShrink:0}}>🔥{qs}</div>}
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <div style={{flex:1,height:5,background:"#0a1020",borderRadius:3,overflow:"hidden"}}>
+                            <div style={{height:"100%",width:ratePct+"%",background:d.color,borderRadius:3}}/>
+                          </div>
+                          <div style={{fontSize:10,color:d.color,fontWeight:700,fontFamily:"'Orbitron',monospace",minWidth:36,textAlign:"right"}}>{ratePct}%</div>
+                        </div>
+                        <div style={{fontSize:9,color:"#334155",marginTop:4}}>Completion-Rate (vs. aktive Tage)</div>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })()}
