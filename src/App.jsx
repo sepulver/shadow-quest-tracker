@@ -994,35 +994,22 @@ export default function App() {
               <div style={{fontSize:11,color:"#2d3f55",marginTop:2}}>{new Date().toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long"})}</div>
             </div>
             <div style={{display:"flex",gap:7,alignItems:"center"}}>
-              {reorderMode
-                ?<button onClick={()=>setReorderMode(false)} style={{background:"linear-gradient(135deg,rgba(56,189,248,.2),rgba(56,189,248,.1))",border:"1px solid rgba(56,189,248,.6)",color:"#38bdf8",borderRadius:9,padding:"8px 14px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>✓ FERTIG</button>
-                :<>
-                  <button onClick={()=>setReorderMode(true)} style={{background:"rgba(71,85,105,.15)",border:"1px solid rgba(71,85,105,.35)",color:"#64748b",borderRadius:9,padding:"8px 10px",fontSize:15,lineHeight:1}} title="Reihenfolge ändern">⇅</button>
-                  <button onClick={openAdd} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ QUEST</button>
-                </>
-              }
+              <button onClick={openAdd} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ QUEST</button>
             </div>
           </div>
-          {/* Category filter chips */}
-          {!reorderMode&&dailyQ.length>2&&(()=>{const usedCats=[...new Set(dailyQ.map(t=>t.category))];return usedCats.length>1?(
-            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:12}}>
-              <button onClick={()=>setCatFilter(null)} style={{padding:"5px 11px",borderRadius:20,fontSize:10,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",border:`1px solid ${catFilter===null?"#38bdf8":"#1e2f48"}`,background:catFilter===null?"rgba(56,189,248,.15)":"transparent",color:catFilter===null?"#38bdf8":"#3a4f6a",letterSpacing:.5}}>ALLE</button>
-              {usedCats.map(k=>{const c=CATS[k]??CATS.sonstige;return(<button key={k} onClick={()=>setCatFilter(f=>f===k?null:k)} style={{padding:"5px 11px",borderRadius:20,fontSize:10,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",border:`1px solid ${catFilter===k?c.color:"#1e2f48"}`,background:catFilter===k?c.color+"20":"transparent",color:catFilter===k?c.color:"#3a4f6a",letterSpacing:.5}}>{c.emoji} {c.label}</button>);})}
-            </div>
-          ):null;})()}
-          {reorderMode&&<div style={{fontSize:10,color:"#334155",textAlign:"center",marginBottom:10,letterSpacing:.5}}>Reihenfolge mit den Pfeilen anpassen</div>}
-          {dailyQ.length===0?<EmptyState/>:dailyQ.filter(t=>t.frequency==="daily"&&(!catFilter||t.category===catFilter)).map((t,i,arr)=>(
-            <div key={t.id} style={{position:"relative",borderRadius:14,background:reorderMode?"rgba(56,189,248,.03)":"transparent",display:"flex",alignItems:"center",gap:6,marginBottom:reorderMode?6:0}}>
-              {reorderMode&&<div style={{display:"flex",flexDirection:"column",gap:3,flexShrink:0}}>
-                <button onClick={()=>{if(i===0)return;const o=[...tpl];const ai=o.findIndex(x=>x.id===arr[i-1].id),bi=o.findIndex(x=>x.id===t.id);[o[ai],o[bi]]=[o[bi],o[ai]];setTpl(o);saveAll(o,comps,plr);}} disabled={i===0} style={{background:i===0?"transparent":"rgba(56,189,248,.12)",border:`1px solid ${i===0?"#0d1628":"rgba(56,189,248,.3)"}`,color:i===0?"#1a2840":"#38bdf8",borderRadius:6,width:26,height:26,fontSize:13,lineHeight:1,cursor:i===0?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▲</button>
-                <button onClick={()=>{if(i===arr.length-1)return;const o=[...tpl];const ai=o.findIndex(x=>x.id===arr[i+1].id),bi=o.findIndex(x=>x.id===t.id);[o[ai],o[bi]]=[o[bi],o[ai]];setTpl(o);saveAll(o,comps,plr);}} disabled={i===arr.length-1} style={{background:i===arr.length-1?"transparent":"rgba(56,189,248,.12)",border:`1px solid ${i===arr.length-1?"#0d1628":"rgba(56,189,248,.3)"}`,color:i===arr.length-1?"#1a2840":"#38bdf8",borderRadius:6,width:26,height:26,fontSize:13,lineHeight:1,cursor:i===arr.length-1?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▼</button>
-              </div>}
-              <div style={{flex:1,position:"relative"}}>
-                {!reorderMode&&<button onClick={e=>{e.stopPropagation();setPauseSheet(t.id);}} style={{position:"absolute",top:8,right:8,zIndex:10,background:"transparent",border:"none",color:"#334155",fontSize:18,lineHeight:1,padding:"2px 6px",cursor:"pointer"}}>···</button>}
-                {t.repeatable?<RepeatRow t={t}/>:<NormalRow t={t} done={doneIds.has(t.id)} onToggle={()=>!reorderMode&&(doneIds.has(t.id)?doUndo(t.id):doComplete(t))}/>}
-              </div>
-            </div>
-          ))}
+          {dailyQ.length===0?<EmptyState/>:Object.entries(CATS).map(([catKey,catVal])=>{
+            const items=[...dailyQ.filter(t=>t.category===catKey)].sort((a,b)=>a.name.localeCompare(b.name));
+            if(!items.length)return null;
+            return(<div key={catKey} style={{marginBottom:16}}>
+              <div style={{fontSize:9,color:catVal.color,letterSpacing:1.5,fontWeight:700,marginBottom:8,fontFamily:"'Orbitron',monospace",opacity:.85}}>{catVal.emoji} {catVal.label.toUpperCase()}</div>
+              {items.map(t=>(
+                <div key={t.id} style={{position:"relative"}}>
+                  <button onClick={e=>{e.stopPropagation();setPauseSheet(t.id);}} style={{position:"absolute",top:8,right:8,zIndex:10,background:"transparent",border:"none",color:"#334155",fontSize:18,lineHeight:1,padding:"2px 6px",cursor:"pointer"}}>···</button>
+                  {t.repeatable?<RepeatRow t={t}/>:<NormalRow t={t} done={doneIds.has(t.id)} onToggle={()=>doneIds.has(t.id)?doUndo(t.id):doComplete(t)}/>}
+                </div>
+              ))}
+            </div>);
+          })}
         </>}
         {/* ═══ WEEK ════════════════════════════════════════════════════════════ */}
         {tab==="week"&&<>
