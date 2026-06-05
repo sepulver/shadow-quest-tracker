@@ -374,7 +374,6 @@ export default function App() {
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(null);
   const [reorderMode, setReorderMode] = useState(false);
-  const [swipeId,    setSwipeId]    = useState(null);   // quest id being swiped
   const [pauseSheet, setPauseSheet] = useState(null);   // quest id for pause bottom sheet
   const [editingId,   setEditingId]   = useState(null);
   const noteTimer = useRef(null);
@@ -991,30 +990,19 @@ export default function App() {
             </div>
           ):null;})()}
           {reorderMode&&<div style={{fontSize:10,color:"#334155",textAlign:"center",marginBottom:10,letterSpacing:.5}}>Reihenfolge mit den Pfeilen anpassen</div>}
-          {dailyQ.length===0?<EmptyState/>:dailyQ.filter(t=>t.frequency==="daily"&&(!catFilter||t.category===catFilter)).map((t,i,arr)=>{
-            const isSwiped=swipeId===t.id&&!reorderMode;
-            return(
-            <div key={t.id} style={{position:"relative",borderRadius:14,background:reorderMode?"rgba(56,189,248,.03)":"transparent",display:"flex",alignItems:"center",gap:6,marginBottom:reorderMode?6:0,overflow:"hidden"}}>
-              {/* Swipe-left pause button */}
-              {!reorderMode&&<div style={{position:"absolute",right:0,top:0,bottom:0,width:72,background:"linear-gradient(135deg,#7f1d1d,#f87171)",borderRadius:"0 14px 14px 0",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,cursor:"pointer",zIndex:1}} onClick={()=>setPauseSheet(t.id)}>
-                <span style={{fontSize:18}}>⏸</span>
-                <span style={{fontSize:8,color:"#fff",fontWeight:700,letterSpacing:.5}}>PAUSE</span>
-              </div>}
+          {dailyQ.length===0?<EmptyState/>:dailyQ.filter(t=>t.frequency==="daily"&&(!catFilter||t.category===catFilter)).map((t,i,arr)=>(
+            <div key={t.id} style={{position:"relative",borderRadius:14,background:reorderMode?"rgba(56,189,248,.03)":"transparent",display:"flex",alignItems:"center",gap:6,marginBottom:reorderMode?6:0}}>
               {reorderMode&&<div style={{display:"flex",flexDirection:"column",gap:3,flexShrink:0}}>
                 <button onClick={()=>{if(i===0)return;const o=[...tpl];const ai=o.findIndex(x=>x.id===arr[i-1].id),bi=o.findIndex(x=>x.id===t.id);[o[ai],o[bi]]=[o[bi],o[ai]];setTpl(o);saveAll(o,comps,plr);}} disabled={i===0} style={{background:i===0?"transparent":"rgba(56,189,248,.12)",border:`1px solid ${i===0?"#0d1628":"rgba(56,189,248,.3)"}`,color:i===0?"#1a2840":"#38bdf8",borderRadius:6,width:26,height:26,fontSize:13,lineHeight:1,cursor:i===0?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▲</button>
                 <button onClick={()=>{if(i===arr.length-1)return;const o=[...tpl];const ai=o.findIndex(x=>x.id===arr[i+1].id),bi=o.findIndex(x=>x.id===t.id);[o[ai],o[bi]]=[o[bi],o[ai]];setTpl(o);saveAll(o,comps,plr);}} disabled={i===arr.length-1} style={{background:i===arr.length-1?"transparent":"rgba(56,189,248,.12)",border:`1px solid ${i===arr.length-1?"#0d1628":"rgba(56,189,248,.3)"}`,color:i===arr.length-1?"#1a2840":"#38bdf8",borderRadius:6,width:26,height:26,fontSize:13,lineHeight:1,cursor:i===arr.length-1?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▼</button>
               </div>}
-              <div style={{flex:1,transform:isSwiped?"translateX(-72px)":"translateX(0)",transition:"transform .25s ease",position:"relative",zIndex:2}}
-                onTouchStart={e=>{if(reorderMode)return;e.currentTarget._tx=e.touches[0].clientX;e.currentTarget._ty=e.touches[0].clientY;e.currentTarget._swiping=false;}}
-                onTouchMove={e=>{if(reorderMode)return;const dx=e.touches[0].clientX-e.currentTarget._tx;const dy=e.touches[0].clientY-(e.currentTarget._ty||0);if(Math.abs(dy)>Math.abs(dx))return;if(dx<-10)e.currentTarget._swiping=true;if(e.currentTarget._swiping){e.preventDefault();const clamped=Math.max(-72,Math.min(0,dx));e.currentTarget.style.transform=`translateX(${clamped}px)`;}}}
-                onTouchEnd={e=>{if(reorderMode)return;const dx=e.changedTouches[0].clientX-e.currentTarget._tx;e.currentTarget.style.transform="";if(dx<-50){setSwipeId(t.id);}else{setSwipeId(null);}}}
-              >
-                {t.repeatable?<RepeatRow t={t}/>:<NormalRow t={t} done={doneIds.has(t.id)} onToggle={()=>{if(!reorderMode){if(isSwiped){setSwipeId(null);}else{doneIds.has(t.id)?doUndo(t.id):doComplete(t);}}}}/>}
+              <div style={{flex:1,position:"relative"}}>
+                {!reorderMode&&<button onClick={e=>{e.stopPropagation();setPauseSheet(t.id);}} style={{position:"absolute",top:8,right:8,zIndex:10,background:"transparent",border:"none",color:"#334155",fontSize:18,lineHeight:1,padding:"2px 6px",cursor:"pointer"}}>···</button>}
+                {t.repeatable?<RepeatRow t={t}/>:<NormalRow t={t} done={doneIds.has(t.id)} onToggle={()=>!reorderMode&&(doneIds.has(t.id)?doUndo(t.id):doComplete(t))}/>}
               </div>
             </div>
-          );})}
+          ))}
         </>}
-
         {/* ═══ WEEK ════════════════════════════════════════════════════════════ */}
         {tab==="week"&&<>
           {/* Week navigation */}
@@ -1029,50 +1017,41 @@ export default function App() {
             <button onClick={()=>setWeekOffset(o=>o+1)} disabled={weekOffset>=0} style={{background:weekOffset>=0?"transparent":"rgba(56,189,248,.08)",border:`1px solid ${weekOffset>=0?"#0d1628":"rgba(56,189,248,.2)"}`,color:weekOffset>=0?"#1a2840":"#38bdf8",borderRadius:9,padding:"7px 13px",fontSize:16,lineHeight:1,cursor:weekOffset>=0?"default":"pointer"}}>></button>
           </div>
 
-          {/* Wochenziel */}
-          <div style={{background:"rgba(56,189,248,.06)",border:"1px solid rgba(56,189,248,.18)",borderRadius:14,padding:"16px 18px",marginBottom:18}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <div>
-                <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,color:"#38bdf8",letterSpacing:2}}>WOCHENZIEL</div>
-                <div style={{fontSize:12,color:"#2d3f55",marginTop:2}}>{weekXP.toLocaleString()} / {(plr.weeklyGoal||500).toLocaleString()} XP</div>
-              </div>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontFamily:"'Orbitron',monospace",fontSize:28,fontWeight:900,color:goalPct>=100?"#4ade80":"#38bdf8"}}>{goalPct}%</div>
-                {editGoal
-                  ?<div style={{display:"flex",gap:6,marginTop:4}}>
-                    <input value={goalInput} onChange={e=>setGoalInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveGoal();if(e.key==="Escape")setEditGoal(false);}} autoFocus placeholder="500" style={{width:70,background:"#111929",border:"1px solid #38bdf8",borderRadius:8,padding:"4px 8px",color:"#38bdf8",fontSize:13,fontFamily:"'Orbitron',monospace",textAlign:"center"}}/>
-                    <button onClick={saveGoal} style={{background:"rgba(56,189,248,.2)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:7,padding:"4px 8px",fontSize:10,fontWeight:700,fontFamily:"'Rajdhani',sans-serif"}}>OK</button>
-                  </div>
-                  :<button onClick={()=>{setGoalInput(String(plr.weeklyGoal||500));setEditGoal(true);}} style={{background:"none",border:"none",color:"#2d3f55",fontSize:10,fontFamily:"'Rajdhani',sans-serif",padding:0,marginTop:2}}>✏️ Ziel ändern</button>
-                }
-              </div>
-            </div>
-            <div style={{height:6,background:"#0a1020",borderRadius:3,overflow:"hidden"}}>
-              <div style={{height:"100%",width:`${goalPct}%`,background:goalPct>=100?"linear-gradient(90deg,#16a34a,#4ade80)":"linear-gradient(90deg,#1d4ed8,#38bdf8)",boxShadow:goalPct>=100?"0 0 10px #4ade80":"0 0 10px #38bdf8",borderRadius:3,transition:"width .8s cubic-bezier(.4,0,.2,1)"}}/>
-            </div>
-          </div>
-
-          {/* Wochenziel-Historie */}
-          {(plr.weekHistory||[]).length>0&&(()=>{
-            const hist=[...(plr.weekHistory||[])].slice(-8).reverse();
+          {/* Wochenziel — context-aware color */}
+          {(()=>{
+            const isPast=weekOffset<0;
+            const histEntry=(plr.weekHistory||[]).find(h=>h.weekStart===wkDays[0]);
+            const displayGoal=histEntry?.goal||plr.weeklyGoal||500;
+            const displayXP=weekC.reduce((s,c)=>(!c.isGhost&&c.earnedXp>0)?s+c.earnedXp:s,0);
+            const pct=Math.min(100,Math.round((displayXP/displayGoal)*100));
+            const reached=isPast?(histEntry?.reached||pct>=100):pct>=100;
+            const barColor=reached?"linear-gradient(90deg,#16a34a,#4ade80)":isPast?"linear-gradient(90deg,#991b1b,#f87171)":"linear-gradient(90deg,#1d4ed8,#38bdf8)";
+            const borderColor=reached?"rgba(74,222,128,.3)":isPast?"rgba(248,113,113,.25)":"rgba(56,189,248,.18)";
+            const bgColor=reached?"rgba(74,222,128,.06)":isPast?"rgba(248,113,113,.05)":"rgba(56,189,248,.06)";
+            const numColor=reached?"#4ade80":isPast?"#f87171":"#38bdf8";
+            const glowColor=reached?"#4ade80":isPast?"#f87171":"#38bdf8";
             return(
-              <div style={{marginBottom:18}}>
-                <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#38bdf8",letterSpacing:2,fontWeight:700,marginBottom:10}}>ZIEL-HISTORIE</div>
-                <div style={{display:"flex",gap:5}}>
-                  {hist.map((h,i)=>{
-                    const pct=h.goal?Math.min(100,Math.round((h.xp/h.goal)*100)):Math.min(100,Math.round((h.xp/1000)*100));
-                    const d=new Date(h.weekStart+"T12:00");
-                    const kw=Math.ceil((((d-new Date(d.getFullYear(),0,1))/86400000)+1)/7);
-                    return(
-                      <div key={h.weekStart} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                        <div style={{width:"100%",height:48,background:"#0a1020",borderRadius:6,display:"flex",alignItems:"flex-end",overflow:"hidden"}}>
-                          <div style={{width:"100%",height:`${Math.max(4,pct)}%`,background:h.reached?"linear-gradient(180deg,#16a34a,#4ade80)":"linear-gradient(180deg,#991b1b,#f87171)",borderRadius:"4px 4px 0 0",transition:"height .4s"}}/>
-                        </div>
-                        <div style={{fontSize:8,color:h.reached?"#4ade80":"#f87171",fontWeight:700,fontFamily:"'Orbitron',monospace"}}>KW{kw}</div>
-                        <div style={{fontSize:7,color:"#334155"}}>{pct}%</div>
+              <div style={{background:bgColor,border:`1px solid ${borderColor}`,borderRadius:14,padding:"16px 18px",marginBottom:18}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                  <div>
+                    <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,color:numColor,letterSpacing:2}}>
+                      WOCHENZIEL{reached?" ✓":isPast?" ✗":""}
+                    </div>
+                    <div style={{fontSize:12,color:"#2d3f55",marginTop:2}}>{displayXP.toLocaleString()} / {displayGoal.toLocaleString()} XP</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontFamily:"'Orbitron',monospace",fontSize:28,fontWeight:900,color:numColor}}>{pct}%</div>
+                    {weekOffset===0&&(editGoal
+                      ?<div style={{display:"flex",gap:6,marginTop:4}}>
+                        <input value={goalInput} onChange={e=>setGoalInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveGoal();if(e.key==="Escape")setEditGoal(false);}} autoFocus placeholder="500" style={{width:70,background:"#111929",border:"1px solid #38bdf8",borderRadius:8,padding:"4px 8px",color:"#38bdf8",fontSize:13,fontFamily:"'Orbitron',monospace",textAlign:"center"}}/>
+                        <button onClick={saveGoal} style={{background:"rgba(56,189,248,.2)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:7,padding:"4px 8px",fontSize:10,fontWeight:700,fontFamily:"'Rajdhani',sans-serif"}}>OK</button>
                       </div>
-                    );
-                  })}
+                      :<button onClick={()=>{setGoalInput(String(displayGoal));setEditGoal(true);}} style={{background:"none",border:"none",color:"#2d3f55",fontSize:10,fontFamily:"'Rajdhani',sans-serif",padding:0,marginTop:2}}>✏️ Ziel ändern</button>
+                    )}
+                  </div>
+                </div>
+                <div style={{height:6,background:"#0a1020",borderRadius:3,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${pct}%`,background:barColor,boxShadow:`0 0 10px ${glowColor}`,borderRadius:3,transition:"width .8s cubic-bezier(.4,0,.2,1)"}}/>
                 </div>
               </div>
             );
