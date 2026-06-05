@@ -261,12 +261,13 @@ function buildWeekHistory(completions){
     }
   });
   return Object.entries(byWeek)
+    .filter(([,{xp}])=>xp>=50) // skip weeks with near-zero xp (before app existed)
     .sort((a,b)=>a[0]<b[0]?-1:1)
     .slice(-12)
     .map(([weekStart,{xp}])=>({
       weekStart, xp,
-      goal:null,           // unknown historical goal
-      reached: xp>=500,    // conservative floor: 500 XP = active week
+      goal:null,
+      reached: true, // historical weeks: if you had activity, count as reached
     }));
 }
 function monDays(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);const year=ref.getFullYear(),month=ref.getMonth(),f=new Date(year,month,1),la=new Date(year,month+1,0),pad=(f.getDay()+6)%7,arr=Array(pad).fill(null);for(let d=1;d<=la.getDate();d++)arr.push(ld(new Date(year,month,d)));return arr;}
@@ -351,10 +352,15 @@ export default function App() {
     const p=mkPlayer(saved?.player);
     const compsInit=saved?.completions??[];
     // Backfill weekHistory from existing completions if empty OR if goals look wrong (old default 500)
-    const hist=p.weekHistory||[];
-    const hasWrongGoal=hist.length>0&&hist.every(h=>h.goal===500||h.goal===undefined);
-    if((!hist.length||hasWrongGoal)&&compsInit.length){
-      p.weekHistory=buildWeekHistory(compsInit);
+    // Always rebuild from completions to ensure correctness
+    if(compsInit.length){
+      const rebuilt=buildWeekHistory(compsInit);
+      // Merge: keep goal values from existing history if present
+      const existing=p.weekHistory||[];
+      p.weekHistory=rebuilt.map(r=>{
+        const ex=existing.find(e=>e.weekStart===r.weekStart);
+        return ex&&ex.goal?{...r,goal:ex.goal,reached:ex.reached??r.reached}:r;
+      });
     }
     return p;
   });
@@ -399,7 +405,8 @@ export default function App() {
     if(!hasCurrentWeek&&hist.length>0){
       const prev=hist[hist.length-1];
       const prevXP=prev.xp||0;
-      const prevGoal=prev.goal||p.weeklyGoal||500;
+      // Always use current weeklyGoal as base (user may have changed it)
+      const prevGoal=p.weeklyGoal||500;
       let newGoal;
       if(prevXP>=prevGoal){ newGoal=Math.round(prevGoal*1.1); }         // reached: +10%
       else if(prevXP>=prevGoal*0.8){ newGoal=prevGoal; }                // close: keep same
@@ -1020,11 +1027,15 @@ export default function App() {
           {/* Wochenziel — context-aware color */}
           {(()=>{
             const isPast=weekOffset<0;
-            const histEntry=(plr.weekHistory||[]).find(h=>h.weekStart===wkDays[0]);
+            const dispWs=wkDays[0];
+            const histEntry=(plr.weekHistory||[]).find(h=>h.weekStart===dispWs);
             const displayGoal=histEntry?.goal||plr.weeklyGoal||500;
-            const displayXP=weekC.reduce((s,c)=>(!c.isGhost&&c.earnedXp>0)?s+c.earnedXp:s,0);
+            // For past weeks use stored xp; for current week use live weekC
+            const displayXP=isPast
+              ?(histEntry?.xp||comps.filter(c=>c.weekStart===dispWs&&!c.isGhost&&c.earnedXp>0).reduce((s,c)=>s+c.earnedXp,0))
+              :weekC.reduce((s,c)=>(!c.isGhost&&c.earnedXp>0)?s+c.earnedXp:s,0);
             const pct=Math.min(100,Math.round((displayXP/displayGoal)*100));
-            const reached=isPast?(histEntry?.reached||pct>=100):pct>=100;
+            const reached=isPast?(histEntry?.reached??pct>=100):pct>=100;
             const barColor=reached?"linear-gradient(90deg,#16a34a,#4ade80)":isPast?"linear-gradient(90deg,#991b1b,#f87171)":"linear-gradient(90deg,#1d4ed8,#38bdf8)";
             const borderColor=reached?"rgba(74,222,128,.3)":isPast?"rgba(248,113,113,.25)":"rgba(56,189,248,.18)";
             const bgColor=reached?"rgba(74,222,128,.06)":isPast?"rgba(248,113,113,.05)":"rgba(56,189,248,.06)";
