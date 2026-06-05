@@ -212,8 +212,10 @@ function isDblXpDay(dateStr){
 function weekDays(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7,mon=new Date(t);mon.setDate(t.getDate()-o+weekOffset*7);return Array.from({length:7},(_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return ld(d);});}
 function weekStartFromOffset(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7,mon=new Date(t);mon.setDate(t.getDate()-o+weekOffset*7);return ld(mon);}
 
-function buildWeekHistory(completions, weeklyGoal){
+function buildWeekHistory(completions){
   // Group completions by weekStart, exclude current week
+  // Use 1000 XP as historical fallback goal (no way to know past goals)
+  const HIST_GOAL = 1000;
   const ws=weekStartFromOffset(0);
   const byWeek={};
   completions.forEach(c=>{
@@ -225,7 +227,7 @@ function buildWeekHistory(completions, weeklyGoal){
   return Object.entries(byWeek)
     .sort((a,b)=>a[0]<b[0]?-1:1)
     .slice(-12)
-    .map(([weekStart,{xp}])=>({weekStart,xp,goal:weeklyGoal||500,reached:xp>=(weeklyGoal||500)}));
+    .map(([weekStart,{xp}])=>({weekStart,xp,goal:HIST_GOAL,reached:xp>=HIST_GOAL}));
 }
 function monDays(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);const year=ref.getFullYear(),month=ref.getMonth(),f=new Date(year,month,1),la=new Date(year,month+1,0),pad=(f.getDay()+6)%7,arr=Array(pad).fill(null);for(let d=1;d<=la.getDate();d++)arr.push(ld(new Date(year,month,d)));return arr;}
 function monLabel(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);return{month:ref.getMonth(),year:ref.getFullYear()};}
@@ -308,9 +310,11 @@ export default function App() {
   const [plr,   setPlr]   = useState(()=>{
     const p=mkPlayer(saved?.player);
     const compsInit=saved?.completions??[];
-    // Backfill weekHistory from existing completions if empty
-    if(!(p.weekHistory||[]).length&&compsInit.length){
-      p.weekHistory=buildWeekHistory(compsInit,p.weeklyGoal||500);
+    // Backfill weekHistory from existing completions if empty OR if goals look wrong (old default 500)
+    const hist=p.weekHistory||[];
+    const hasWrongGoal=hist.length>0&&hist.every(h=>h.goal===500||h.goal===undefined);
+    if((!hist.length||hasWrongGoal)&&compsInit.length){
+      p.weekHistory=buildWeekHistory(compsInit);
     }
     return p;
   });
