@@ -198,7 +198,7 @@ function monDays(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth
 function monLabel(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);return{month:ref.getMonth(),year:ref.getFullYear()};}
 function weekLabel(weekOffset=0){const days=weekDays(weekOffset);const start=new Date(days[0]+"T12:00"),end=new Date(days[6]+"T12:00");const fmt=d=>d.toLocaleDateString("de-DE",{day:"numeric",month:"short"});const d=new Date(days[0]+"T12:00");d.setHours(0,0,0,0);d.setDate(d.getDate()+4-(d.getDay()||7));const kw=Math.ceil((((d-new Date(d.getFullYear(),0,1))/86400000)+1)/7);return{label:`KW ${kw}: ${fmt(start)} - ${fmt(end)}`,kw};}
 function migTpl(arr){return arr.map((t,i)=>({repeatable:false,activeDays:[],weekLimit:0,...t,frequency:t.frequency==="weekly"?"daily":t.frequency??(t.recurring?"daily":"daily"),weekLimit:t.frequency==="weekly"?Math.max(t.weekLimit||0,1):t.weekLimit||0,order:t.order??i}));}
-function mkPlayer(p={}){const base={name:"Tim",streak:0,lastDate:null,completedOnce:[],weeklyGoal:500,freezes:1,lastFreezeMonth:null,achievements:[],usedFreeze:false,...p};base.achievements=migAchs(base.achievements);return base;}
+function mkPlayer(p={}){const base={name:"Tim",streak:0,lastDate:null,completedOnce:[],weeklyGoal:500,freezes:1,lastFreezeMonth:null,achievements:[],usedFreeze:false,weekHistory:[],...p};base.achievements=migAchs(base.achievements);return base;}
 
 // Returns consecutive days streak for a specific template up to (not including) today
 function questStreak(comps, templateId, today, template) {
@@ -354,11 +354,28 @@ export default function App() {
       newPlr = {...newPlr, achievements:achs};
       setAchFlash({ach:updates[0].ach, tier:updates[0].tier, newLevel:updates[0].newLevel, key:Date.now()});
     }
+    // Track weekly goal history — record prev week when week rolls over
+    const prevWs = newComps.length>1 ? newComps[newComps.length-2]?.weekStart : null;
+    if(prevWs && prevWs !== ws){
+      const prevXP = newComps.filter(c=>c.weekStart===prevWs).reduce((s,c)=>s+c.earnedXp,0);
+      const prevGoal = newPlr.weeklyGoal||500;
+      const hist = [...(newPlr.weekHistory||[])];
+      if(!hist.find(h=>h.weekStart===prevWs)){
+        hist.push({weekStart:prevWs, xp:prevXP, goal:prevGoal, reached:prevXP>=prevGoal});
+        if(hist.length>12) hist.splice(0, hist.length-12); // keep last 12 weeks
+        newPlr = {...newPlr, weekHistory:hist};
+      }
+    }
     setComps(newComps); setPlr(newPlr); saveAll(tpl,newComps,newPlr);
   }
 
   function doComplete(t) {
-    const base=DIFF[t.difficulty].xp, earned=(base+bon)*(dblXp?2:1);
+    const base=DIFF[t.difficulty].xp;
+    const qs=questStreak(comps,t.id,today,t);
+    const diffMult=diffStreakMult(qs,t.difficulty);
+    const activeSeason=getActiveSeason(today);
+    const seasonMult=activeSeason?activeSeason.xpMult:1;
+    const earned=Math.round((base+bon)*(dblXp?2:1)*diffMult*seasonMult);
     const id=Date.now()+"";
     const nc=[...comps,{id,templateId:t.id,name:t.name,category:t.category,difficulty:t.difficulty,emoji:t.emoji,frequency:t.frequency,repeatable:t.repeatable||false,baseXp:base,streakBonus:bon,earnedXp:earned,date:today,weekStart:ws,ts:Date.now(),note:""}];
     let np={...plr};
@@ -452,8 +469,10 @@ export default function App() {
 
   // ── Sub-Components ───────────────────────────────────────────────────────────
   function NormalRow({t,done,onToggle}){
-    const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,earned=(d.xp+bon)*(dblXp?2:1);
+    const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;
     const qStreak=questStreak(comps,t.id,today,t);
+    const dm=diffStreakMult(qStreak,t.difficulty);
+    const earned=Math.round((d.xp+bon)*(dblXp?2:1)*dm);
     return(<div className="tap" onClick={onToggle} style={{background:done?"rgba(12,17,30,.5)":"rgba(12,18,40,.95)",border:`1px solid ${done?"#0d1628":d.color+"38"}`,borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12,opacity:done?.48:1,boxShadow:done?"none":`0 2px 16px ${d.color}12`,transition:"all .18s"}}>
       <div style={{fontSize:25,minWidth:40,textAlign:"center"}}>{t.emoji}</div>
       <div style={{flex:1,minWidth:0}}>
@@ -466,7 +485,7 @@ export default function App() {
         </div>
       </div>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,minWidth:52}}>
-        <XPLabel earned={earned} bon={bon} done={done} color={d.color} dbl={dblXp}/>
+        <XPLabel earned={earned} bon={bon} done={done} color={d.color} dbl={dblXp} mult={dm}/>
         <Circle done={done} color={d.color}/>
       </div>
     </div>);
@@ -548,6 +567,11 @@ export default function App() {
           </div>
         </div>
       );})()}
+      {lvlFlash&&<div key={lvlFlash.key} style={{position:"fixed",top:"50%",left:"50%",zIndex:9997,pointerEvents:"none",animation:"lvlUp 2.8s ease-out forwards",transform:"translate(-50%,-50%)",textAlign:"center",background:"radial-gradient(ellipse,rgba(56,189,248,.18) 0%,transparent 70%)",padding:"40px 50px",borderRadius:30}} onAnimationEnd={()=>setLvlFlash(null)}>
+        <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#38bdf8",letterSpacing:4,marginBottom:8,textShadow:"0 0 20px #38bdf8"}}>LEVEL UP</div>
+        <div style={{fontFamily:"'Orbitron',monospace",fontSize:72,fontWeight:900,color:lvlFlash.rank.color,lineHeight:1,textShadow:`0 0 40px ${lvlFlash.rank.color},0 0 80px ${lvlFlash.rank.color}60`}}>{lvlFlash.level}</div>
+        <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,color:lvlFlash.rank.color,letterSpacing:3,marginTop:8,opacity:.9}}>{lvlFlash.rank.rank} · {lvlFlash.rank.title}</div>
+      </div>}
 
       {/* Note Input */}
       {pendingNote&&<div style={{position:"fixed",bottom:80,left:0,right:0,zIndex:300,maxWidth:480,margin:"0 auto",padding:"0 16px",animation:"slideUp .2s ease"}}>
@@ -595,7 +619,8 @@ export default function App() {
               <span style={{fontFamily:"'Orbitron',monospace",fontSize:15,fontWeight:700,color:"#fbbf24",lineHeight:1}}>{plr.streak}</span>
               <span style={{fontSize:8,color:"#78350f",letterSpacing:1,fontWeight:700}}>STREAK</span>
             </div>
-            {dblXp&&<div style={{background:"rgba(250,204,21,.12)",border:"1px solid rgba(250,204,21,.4)",borderRadius:12,padding:"8px 10px",display:"flex",flexDirection:"column",alignItems:"center",gap:2,animation:"glow 1.5s ease infinite"}}>
+            {(()=>{const s=getActiveSeason(today);return s&&<div style={{background:`${s.color}18`,border:`1px solid ${s.color}60`,borderRadius:12,padding:"8px 10px",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}><div style={{fontSize:16}}>{s.emoji}</div><div style={{fontFamily:"'Orbitron',monospace",fontSize:7,color:s.color,fontWeight:700,letterSpacing:.5}}>×{s.xpMult}</div></div>;})()}
+              {dblXp&&<div style={{background:"rgba(250,204,21,.12)",border:"1px solid rgba(250,204,21,.4)",borderRadius:12,padding:"8px 10px",display:"flex",flexDirection:"column",alignItems:"center",gap:2,animation:"glow 1.5s ease infinite"}}>
               <span style={{fontSize:15}}>⚡</span>
               <span style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:900,color:"#fde047",lineHeight:1}}>x2</span>
               <span style={{fontSize:8,color:"#713f12",letterSpacing:1,fontWeight:700}}>XP</span>
@@ -624,6 +649,7 @@ export default function App() {
 
         {/* ═══ TODAY ═══════════════════════════════════════════════════════════ */}
         {tab==="today"&&<>
+          {(()=>{const s=getActiveSeason(today);return s&&<div style={{background:`linear-gradient(135deg,${s.color}18,${s.color}08)`,border:`1px solid ${s.color}50`,borderRadius:14,padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:12,animation:"slideUp .4s ease"}}><div style={{fontSize:24}}>{s.emoji}</div><div><div style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:s.color,letterSpacing:2,fontWeight:700}}>{s.name.toUpperCase()} · ×{s.xpMult} XP</div><div style={{fontSize:11,color:"#64748b",marginTop:2}}>{s.desc}</div></div></div>;})()}
           {dblXp&&<div style={{background:"linear-gradient(135deg,rgba(250,204,21,.12),rgba(250,204,21,.06))",border:"1px solid rgba(250,204,21,.35)",borderRadius:14,padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:12,animation:"slideUp .4s ease"}}>
             <span style={{fontSize:22}}>⚡</span>
             <div>
@@ -732,6 +758,32 @@ export default function App() {
               <div style={{height:"100%",width:`${goalPct}%`,background:goalPct>=100?"linear-gradient(90deg,#16a34a,#4ade80)":"linear-gradient(90deg,#1d4ed8,#38bdf8)",boxShadow:goalPct>=100?"0 0 10px #4ade80":"0 0 10px #38bdf8",borderRadius:3,transition:"width .8s cubic-bezier(.4,0,.2,1)"}}/>
             </div>
           </div>
+
+          {/* Wochenziel-Historie */}
+          {(plr.weekHistory||[]).length>0&&(()=>{
+            const hist=[...(plr.weekHistory||[])].slice(-8).reverse();
+            return(
+              <div style={{marginBottom:18}}>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#38bdf8",letterSpacing:2,fontWeight:700,marginBottom:10}}>ZIEL-HISTORIE</div>
+                <div style={{display:"flex",gap:5}}>
+                  {hist.map((h,i)=>{
+                    const pct=Math.min(100,Math.round((h.xp/h.goal)*100));
+                    const d=new Date(h.weekStart+"T12:00");
+                    const kw=Math.ceil((((d-new Date(d.getFullYear(),0,1))/86400000)+1)/7);
+                    return(
+                      <div key={h.weekStart} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                        <div style={{width:"100%",height:48,background:"#0a1020",borderRadius:6,display:"flex",alignItems:"flex-end",overflow:"hidden"}}>
+                          <div style={{width:"100%",height:`${Math.max(4,pct)}%`,background:h.reached?"linear-gradient(180deg,#16a34a,#4ade80)":"linear-gradient(180deg,#991b1b,#f87171)",borderRadius:"4px 4px 0 0",transition:"height .4s"}}/>
+                        </div>
+                        <div style={{fontSize:8,color:h.reached?"#4ade80":"#f87171",fontWeight:700,fontFamily:"'Orbitron',monospace"}}>KW{kw}</div>
+                        <div style={{fontSize:7,color:"#334155"}}>{pct}%</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {(()=>{const mx=Math.max(1,...weekData.map(d=>d.xp));return<>
             <div style={{display:"flex",gap:6,alignItems:"flex-end",height:110,marginBottom:7}}>
@@ -1230,7 +1282,7 @@ export default function App() {
 
 // ─── Micro Components ─────────────────────────────────────────────────────────
 function Tag({color,label}){return<span style={{fontSize:9,padding:"2px 7px",borderRadius:20,fontWeight:700,letterSpacing:.5,color,background:color+"15"}}>{label}</span>;}
-function XPLabel({earned,bon,done,color,dbl}){return<><div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:700,color:done?"#2d3f55":color}}>+{earned}<span style={{fontSize:8}}>XP</span></div>{bon>0&&!done&&<div style={{fontSize:9,color:"#fbbf24"}}>🔥+{bon}</div>}{dbl&&!done&&<div style={{fontSize:9,color:"#fde047"}}>⚡x2</div>}</>;}
+function XPLabel({earned,bon,done,color,dbl,mult}){return<><div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:700,color:done?"#2d3f55":color}}>+{earned}<span style={{fontSize:8}}>XP</span></div>{bon>0&&!done&&<div style={{fontSize:9,color:"#fbbf24"}}>🔥+{bon}</div>}{dbl&&!done&&<div style={{fontSize:9,color:"#fde047"}}>⚡×2</div>}{mult&&mult>1&&!done&&<div style={{fontSize:9,color:"#f97316",fontWeight:700}}>🔥×{mult.toFixed(2).replace(/\.?0+$/,"")}</div>}</>;}
 function Circle({done,color}){return<div style={{width:30,height:30,borderRadius:"50%",border:`2px solid ${done?"#1a2540":color+"55"}`,background:done?color+"22":"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s"}}>{done&&<span style={{color,fontSize:15,fontWeight:700}}>✓</span>}</div>;}
 function SecHead({label,color,count,sub,onAdd,btnColor}){return<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
   <div><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color,letterSpacing:2}}>{label}</div><div style={{fontSize:9,color,background:color+"20",border:`1px solid ${color}50`,borderRadius:20,padding:"2px 8px",fontWeight:700}}>{count}</div></div><div style={{fontSize:11,color:"#2d3f55",marginTop:2}}>{sub}</div></div>
