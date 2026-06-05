@@ -294,6 +294,7 @@ export default function App() {
   const [profTab, setProfTab] = useState("hunter");
   const [flash, setFlash] = useState(null);         // {xp, key}
   const [achFlash, setAchFlash] = useState(null);   // achievement unlock
+  const [lvlFlash, setLvlFlash] = useState(null);   // {level, rank, key}
   const [showAdd,   setShowAdd]   = useState(false);
   const [showFreeze,setShowFreeze]= useState(false); // freeze prompt
   const [pendingNote, setPendingNote] = useState(null); // {compId}
@@ -398,6 +399,13 @@ export default function App() {
         if(hist.length>12) hist.splice(0, hist.length-12); // keep last 12 weeks
         newPlr = {...newPlr, weekHistory:hist};
       }
+    }
+    // Level-up detection
+    const newTotalXP=newComps.reduce((s,c)=>s+c.earnedXp,0);
+    const newLvl=lvlInfo(newTotalXP);
+    if(newLvl.level>lv.level){
+      const newRank=RANKS.find(r=>newLvl.level>=r.min&&newLvl.level<=r.max)||RANKS[0];
+      setLvlFlash({level:newLvl.level,rank:newRank,key:Date.now()});
     }
     setComps(newComps); setPlr(newPlr); saveAll(tpl,newComps,newPlr);
   }
@@ -577,7 +585,7 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap');
         *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{margin:0;background:#060612}
-        @keyframes xpFloat{0%{opacity:0;transform:translate(-50%,-50%) scale(.6)}15%{opacity:1;transform:translate(-50%,-65%) scale(1.35)}65%{opacity:1;transform:translate(-50%,-85%) scale(1)}100%{opacity:0;transform:translate(-50%,-110%) scale(.85)}}
+        @keyframes lvlUp{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}75%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-52%) scale(.95)}}@keyframes xpFloat{0%{opacity:0;transform:translate(-50%,-50%) scale(.6)}15%{opacity:1;transform:translate(-50%,-65%) scale(1.35)}65%{opacity:1;transform:translate(-50%,-85%) scale(1)}100%{opacity:0;transform:translate(-50%,-110%) scale(.85)}}
         @keyframes achSlide{0%{opacity:0;transform:translateY(60px)}15%{opacity:1;transform:translateY(0)}80%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-20px)}}
         @keyframes shimmer{0%,100%{opacity:.5}50%{opacity:1}}@keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@keyframes glow{0%,100%{opacity:.7}50%{opacity:1}}
         .tap:active{transform:scale(.96);opacity:.85}.tab-btn{transition:color .15s,border-color .15s}.modal-sheet{animation:slideUp .22s ease}
