@@ -76,6 +76,11 @@ const ACHIEVEMENTS = [
     {level:2, label:"Silber", desc:"150 Haushalt-Quests", check:s=>(s.cat.haushalt||0)>=150},
     {level:3, label:"Gold",   desc:"500 Haushalt-Quests", check:s=>(s.cat.haushalt||0)>=500},
   ]},
+  { id:"weekly_goal", emoji:"🎯", title:"Goal Crusher", tiers:[
+    {level:1, label:"Bronze", desc:"5 Wochen in Folge Ziel erreicht (+75 XP/Woche)",  check:s=>(s.weekGoalStreak||0)>=5},
+    {level:2, label:"Silber", desc:"12 Wochen in Folge Ziel erreicht (+150 XP/Woche)", check:s=>(s.weekGoalStreak||0)>=12},
+    {level:3, label:"Gold",   desc:"24 Wochen in Folge Ziel erreicht (+300 XP/Woche)", check:s=>(s.weekGoalStreak||0)>=24},
+  ]},
 ];
 // Helpers to work with the new format
 const TIER_COLORS = {1:"#cd7f32", 2:"#94a3b8", 3:"#fbbf24"}; // bronze, silver, gold
@@ -213,13 +218,11 @@ function weekDays(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7,mon=new Da
 function weekStartFromOffset(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7,mon=new Date(t);mon.setDate(t.getDate()-o+weekOffset*7);return ld(mon);}
 
 function buildWeekHistory(completions){
-  // Group completions by weekStart, exclude current week
-  // Use 1000 XP as historical fallback goal (no way to know past goals)
-  const HIST_GOAL = 1000;
+  // Group completions by weekStart, exclude current week and ghost completions
   const ws=weekStartFromOffset(0);
   const byWeek={};
   completions.forEach(c=>{
-    if(c.weekStart&&c.weekStart!==ws){
+    if(c.weekStart&&c.weekStart!==ws&&!c.isGhost&&c.earnedXp>0){
       if(!byWeek[c.weekStart])byWeek[c.weekStart]={xp:0};
       byWeek[c.weekStart].xp+=c.earnedXp;
     }
@@ -227,13 +230,17 @@ function buildWeekHistory(completions){
   return Object.entries(byWeek)
     .sort((a,b)=>a[0]<b[0]?-1:1)
     .slice(-12)
-    .map(([weekStart,{xp}])=>({weekStart,xp,goal:HIST_GOAL,reached:xp>=HIST_GOAL}));
+    .map(([weekStart,{xp}])=>({
+      weekStart, xp,
+      goal:null,           // unknown historical goal
+      reached: xp>=500,    // conservative floor: 500 XP = active week
+    }));
 }
 function monDays(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);const year=ref.getFullYear(),month=ref.getMonth(),f=new Date(year,month,1),la=new Date(year,month+1,0),pad=(f.getDay()+6)%7,arr=Array(pad).fill(null);for(let d=1;d<=la.getDate();d++)arr.push(ld(new Date(year,month,d)));return arr;}
 function monLabel(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);return{month:ref.getMonth(),year:ref.getFullYear()};}
 function weekLabel(weekOffset=0){const days=weekDays(weekOffset);const start=new Date(days[0]+"T12:00"),end=new Date(days[6]+"T12:00");const fmt=d=>d.toLocaleDateString("de-DE",{day:"numeric",month:"short"});const d=new Date(days[0]+"T12:00");d.setHours(0,0,0,0);d.setDate(d.getDate()+4-(d.getDay()||7));const kw=Math.ceil((((d-new Date(d.getFullYear(),0,1))/86400000)+1)/7);return{label:`KW ${kw}: ${fmt(start)} - ${fmt(end)}`,kw};}
 function migTpl(arr){return arr.map((t,i)=>({repeatable:false,activeDays:[],weekLimit:0,...t,frequency:t.frequency==="weekly"?"daily":t.frequency??(t.recurring?"daily":"daily"),weekLimit:t.frequency==="weekly"?Math.max(t.weekLimit||0,1):t.weekLimit||0,order:t.order??i}));}
-function mkPlayer(p={}){const base={name:"Tim",streak:0,lastDate:null,completedOnce:[],weeklyGoal:500,freezes:1,lastFreezeMonth:null,achievements:[],usedFreeze:false,weekHistory:[],...p};base.achievements=migAchs(base.achievements);return base;}
+function mkPlayer(p={}){const base={name:"Tim",streak:0,lastDate:null,completedOnce:[],weeklyGoal:500,freezes:1,lastFreezeMonth:null,achievements:[],usedFreeze:false,weekHistory:[],weekGoalStreak:0,weekGoalBonusPaid:null,...p};base.achievements=migAchs(base.achievements);return base;}
 
 // Returns consecutive days streak for a specific template up to (not including) today
 function questStreak(comps, templateId, today, template) {
@@ -280,7 +287,7 @@ function diffStreakMult(streak, difficulty){
 function computeStats(comps, player, level) {
   const cat={};
   comps.forEach(c=>{cat[c.category]=(cat[c.category]||0)+1;});
-  return { total:comps.length, totalXP:comps.reduce((s,c)=>s+c.earnedXp,0), streak:player.streak, level, cat, onceDone:(player.completedOnce||[]).length, usedFreeze:player.usedFreeze||false };
+  return { total:comps.length, totalXP:comps.reduce((s,c)=>s+c.earnedXp,0), streak:player.streak, level, cat, onceDone:(player.completedOnce||[]).length, usedFreeze:player.usedFreeze||false, weekGoalStreak:player.weekGoalStreak||0 };
 }
 // Returns array of {ach, newLevel} for newly reached tiers
 function checkAchievementUpdates(stats, plrAchs) {
@@ -345,7 +352,7 @@ export default function App() {
     const yest=ld(new Date(Date.now()-86400000)), mon=MONTH();
     let p={...plr};
     // Freeze regen: 1 per month, max 2
-    if(p.lastFreezeMonth!==mon){p={...p,freezes:Math.min(2,(p.freezes||0)+1),lastFreezeMonth:mon};}
+    if(p.lastFreezeMonth!==mon){p={...p,freezes:Math.min(5,(p.freezes||0)+1),lastFreezeMonth:mon};}
     // Streak check
     if(p.lastDate&&p.lastDate<yest){
       if(p.streak>0&&p.freezes>0){ setShowFreeze(true); }
@@ -428,6 +435,21 @@ export default function App() {
         newPlr = {...newPlr, weekHistory:hist};
       }
     }
+    // Weekly goal bonus: pay out once per week when goal first reached
+    const curWeekXP=newComps.filter(c=>c.weekStart===ws).reduce((s,c)=>s+c.earnedXp,0);
+    const goal=newPlr.weeklyGoal||500;
+    const goalJustReached=curWeekXP>=goal&&(newPlr.weekGoalBonusPaid!==ws);
+    if(goalJustReached){
+      const wgs=newPlr.weekGoalStreak||0;
+      const achLvl=getAchLevel(migAchs(newPlr.achievements||[]),'weekly_goal');
+      const bonusMap={0:0,1:75,2:150,3:300};
+      const bonus=bonusMap[achLvl]||0;
+      newPlr={...newPlr,weekGoalBonusPaid:ws,weekGoalStreak:wgs+1};
+      if(bonus>0){
+        const bonusComp={id:'wgb_'+ws,templateId:'_weekgoal',name:'Wochenziel erreicht!',category:'sonstige',difficulty:'normal',emoji:'🎯',frequency:'bonus',repeatable:false,baseXp:bonus,streakBonus:0,earnedXp:bonus,date:today,weekStart:ws,ts:Date.now(),note:''};
+        newComps=[...newComps,bonusComp];
+      }
+    }
     // Level-up detection
     const newTotalXP=newComps.reduce((s,c)=>s+c.earnedXp,0);
     const newLvl=lvlInfo(newTotalXP);
@@ -444,7 +466,8 @@ export default function App() {
     const diffMult=diffStreakMult(qs,t.difficulty);
     const activeSeason=getActiveSeason(today);
     const seasonMult=activeSeason?activeSeason.xpMult:1;
-    const earned=Math.round((base+bon)*(dblXp?2:1)*diffMult*seasonMult);
+    const bossMult=t.frequency==="boss"?3:1;
+    const earned=Math.round((base+bon)*(dblXp?2:1)*diffMult*seasonMult*bossMult);
     const id=Date.now()+"";
     const nc=[...comps,{id,templateId:t.id,name:t.name,category:t.category,difficulty:t.difficulty,emoji:t.emoji,frequency:t.frequency,repeatable:t.repeatable||false,baseXp:base,streakBonus:bon,earnedXp:earned,date:today,weekStart:ws,ts:Date.now(),note:""}];
     let np={...plr};
@@ -477,8 +500,17 @@ export default function App() {
   function doResetOnce(id){const np={...plr,completedOnce:(plr.completedOnce||[]).filter(x=>x!==id)};setPlr(np);saveAll(tpl,comps,np);}
 
   function doFreeze(){
+    const yest=ld(new Date(Date.now()-86400000));
+    // Ghost completions: preserve quest streaks for yesterday
+    const ghostComps=tpl.filter(t=>t.frequency==="daily").map(t=>({
+      id:'freeze_'+t.id+'_'+yest,templateId:t.id,name:t.name,category:t.category,
+      difficulty:t.difficulty,emoji:t.emoji,frequency:t.frequency,repeatable:false,
+      baseXp:0,streakBonus:0,earnedXp:0,date:yest,weekStart:ws,ts:Date.now(),note:'❄️ freeze',isGhost:true
+    }));
+    // Only add ghost if no real completion yesterday
+    const newComps=[...comps,...ghostComps.filter(g=>!comps.some(c=>c.templateId===g.templateId&&c.date===yest))];
     const np={...plr,freezes:plr.freezes-1,usedFreeze:true};
-    setPlr(np); saveAll(tpl,comps,np); setShowFreeze(false);
+    setComps(newComps); setPlr(np); saveAll(tpl,newComps,np); setShowFreeze(false);
     afterComplete(comps,np);
   }
   function doBreakStreak(){const np={...plr,streak:0};setPlr(np);saveAll(tpl,comps,np);setShowFreeze(false);}
@@ -500,7 +532,9 @@ export default function App() {
       const nt=tpl.map(t=>t.id===editingId?{...t,...newQ,name:newQ.name.trim()}:t);
       setTpl(nt); saveAll(nt,comps,plr);
     } else {
-      const id='t'+Date.now(),t={...newQ,id,name:newQ.name.trim(),order:Date.now()};
+      const id='t'+Date.now();
+      const bossDeadline=newQ.frequency==="boss"?(()=>{const bd=new Date();bd.setDate(bd.getDate()+(newQ.bossDeadlineDays||7));return bd.getFullYear()+"-"+String(bd.getMonth()+1).padStart(2,"0")+"-"+String(bd.getDate()).padStart(2,"0");})():undefined;
+      const t={...newQ,id,name:newQ.name.trim(),order:Date.now(),...(bossDeadline?{bossDeadline,bossStatus:"active"}:{})};
       const nt=[...tpl,t]; setTpl(nt); saveAll(nt,comps,plr);
     }
     setNewQ({...EMPTY_Q});
@@ -679,10 +713,10 @@ export default function App() {
             </div>
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            {plr.freezes>0&&<div style={{background:"rgba(56,189,248,.08)",border:"1px solid rgba(56,189,248,.2)",borderRadius:10,padding:"6px 10px",textAlign:"center"}}>
+            <div onClick={()=>plr.freezes>0&&setShowFreeze(true)} style={{background:plr.freezes>0?"rgba(56,189,248,.12)":"rgba(255,255,255,.03)",border:`1px solid ${plr.freezes>0?"rgba(56,189,248,.35)":"#1a2840"}`,borderRadius:10,padding:"6px 10px",textAlign:"center",cursor:plr.freezes>0?"pointer":"default",opacity:plr.freezes>0?1:.45}}>
               <div style={{fontSize:14}}>❄️</div>
-              <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:700,color:"#38bdf8",lineHeight:1}}>{plr.freezes}</div>
-            </div>}
+              <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,fontWeight:700,color:plr.freezes>0?"#38bdf8":"#2d3f55",lineHeight:1}}>{plr.freezes}</div>
+            </div>
             <div style={{background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.22)",borderRadius:12,padding:"8px 12px",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
               <span style={{fontSize:17}}>🔥</span>
               <span style={{fontFamily:"'Orbitron',monospace",fontSize:15,fontWeight:700,color:"#fbbf24",lineHeight:1}}>{plr.streak}</span>
@@ -752,6 +786,35 @@ export default function App() {
             {onceActive.map(t=><OnceRow key={t.id} t={t}/>)}
             <HR/>
           </>}
+          {/* Boss Quests */}
+          {(()=>{
+            const bossQuests=tpl.filter(t=>t.frequency==="boss"&&t.bossStatus!=="done"&&t.bossStatus!=="failed");
+            if(!bossQuests.length)return null;
+            return bossQuests.map(t=>{
+              const d=DIFF[t.difficulty];
+              const deadline=t.bossDeadline?new Date(t.bossDeadline+"T23:59:59"):null;
+              const daysLeft=deadline?Math.max(0,Math.ceil((deadline-new Date())/(86400000))):null;
+              return(
+                <div key={t.id} style={{background:"linear-gradient(135deg,rgba(248,113,113,.12),rgba(248,113,113,.05))",border:"1px solid rgba(248,113,113,.5)",borderRadius:16,padding:"16px",marginBottom:12,animation:"slideUp .3s ease"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{fontSize:28}}>{t.emoji}</div>
+                      <div>
+                        <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#f87171",letterSpacing:2,fontWeight:700}}>BOSS QUEST</div>
+                        <div style={{fontWeight:700,fontSize:16,color:"#fee2e2",marginTop:2}}>{t.name}</div>
+                        <div style={{fontSize:10,color:"#f87171",marginTop:2}}>x3 XP · {d.label}</div>
+                      </div>
+                    </div>
+                    {daysLeft!==null&&<div style={{textAlign:"center",flexShrink:0}}>
+                      <div style={{fontFamily:"'Orbitron',monospace",fontSize:22,fontWeight:900,color:daysLeft<=2?"#f87171":"#fbbf24",lineHeight:1}}>{daysLeft}</div>
+                      <div style={{fontSize:8,color:"#7f1d1d",letterSpacing:1,fontWeight:700}}>{daysLeft===1?"TAG":"TAGE"}</div>
+                    </div>}
+                  </div>
+                  <button className="tap" onClick={()=>doComplete(t)} style={{width:"100%",padding:"11px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#991b1b,#f87171)",color:"#fff",fontFamily:"'Orbitron',monospace",fontWeight:700,fontSize:11,letterSpacing:1}}>QUEST ABSCHLIESSEN</button>
+                </div>
+              );
+            });
+          })()}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
             <div>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -836,7 +899,7 @@ export default function App() {
                 <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#38bdf8",letterSpacing:2,fontWeight:700,marginBottom:10}}>ZIEL-HISTORIE</div>
                 <div style={{display:"flex",gap:5}}>
                   {hist.map((h,i)=>{
-                    const pct=Math.min(100,Math.round((h.xp/h.goal)*100));
+                    const pct=h.goal?Math.min(100,Math.round((h.xp/h.goal)*100)):Math.min(100,Math.round((h.xp/1000)*100));
                     const d=new Date(h.weekStart+"T12:00");
                     const kw=Math.ceil((((d-new Date(d.getFullYear(),0,1))/86400000)+1)/7);
                     return(
@@ -1274,6 +1337,12 @@ export default function App() {
                 ))}
               </div>
             </div>
+            {newQ.frequency==="boss"&&<div style={{marginBottom:14}}>
+                <div style={{fontSize:11,color:"#f87171",fontWeight:700,marginBottom:6,letterSpacing:.5}}>Deadline (Tage ab heute)</div>
+                <input type="number" min="1" max="90" value={newQ.bossDeadlineDays||7}
+                  onChange={e=>setNewQ(q=>({...q,bossDeadlineDays:Math.max(1,parseInt(e.target.value)||7)}))}
+                  style={{width:"100%",background:"#111929",border:"1px solid rgba(248,113,113,.4)",borderRadius:9,padding:"10px 14px",color:"#fee2e2",fontSize:14,fontFamily:"'Rajdhani',sans-serif"}}/>
+              </div>}
             {newQ.frequency==="daily"&&<div style={{marginBottom:14,background:"rgba(251,191,36,.06)",border:"1px solid rgba(251,191,36,.2)",borderRadius:11,padding:"11px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <div>
                 <div style={{fontSize:13,fontWeight:700,color:"#fbbf24"}}>🔁 Mehrfach täglich</div>
