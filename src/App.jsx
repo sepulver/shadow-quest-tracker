@@ -271,7 +271,6 @@ export default function App() {
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(null);
   const [reorderMode, setReorderMode] = useState(false);
-  const [tplSort,     setTplSort]     = useState('manual');
   const [editingId,   setEditingId]   = useState(null);
   const noteTimer = useRef(null);
 
@@ -812,21 +811,25 @@ export default function App() {
               <div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#38bdf8",letterSpacing:2}}>TEMPLATES</div>
               <div style={{fontSize:11,color:"#2d3f55",marginTop:3}}>{tpl.filter(t=>t.frequency==="daily").length} daily · {onceQ.length} einmalig</div>
             </div>
-            <div style={{display:"flex",gap:7}}>
-              <button onClick={()=>setTplSort(s=>s==='alpha'?'manual':'alpha')} style={{background:tplSort==='alpha'?"rgba(56,189,248,.15)":"rgba(71,85,105,.1)",border:"1px solid rgba(56,189,248,.3)",color:tplSort==='alpha'?"#38bdf8":"#64748b",borderRadius:9,padding:"8px 10px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif"}}>A-Z</button>
-              <button onClick={openAdd} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ NEW</button>
-            </div>
+            <button onClick={openAdd} style={{background:"rgba(56,189,248,.12)",border:"1px solid rgba(56,189,248,.4)",color:"#38bdf8",borderRadius:9,padding:"8px 15px",fontSize:11,fontWeight:700,fontFamily:"'Rajdhani',sans-serif",letterSpacing:1}}>+ NEW</button>
           </div>
 
           {tpl.filter(t=>t.frequency==="daily").length>0&&<>
-            <div style={{fontSize:9,color:"#38bdf8",letterSpacing:2,fontWeight:700,marginBottom:10,fontFamily:"'Orbitron',monospace"}}>⚔️ DAILY</div>
-            {(tplSort==='alpha'?[...tpl.filter(t=>t.frequency==="daily")].sort((a,b)=>a.name.localeCompare(b.name)):[...tpl.filter(t=>t.frequency==="daily")].sort((a,b)=>(a.order??0)-(b.order??0))).map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige;return(
-              <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} onEdit={()=>openEdit(t)} extra={t.repeatable&&<Tag color="#fbbf24" label="🔁 REPEAT"/>}/>
-            );})}
+            <div style={{fontSize:9,color:"#38bdf8",letterSpacing:2,fontWeight:700,marginBottom:12,fontFamily:"'Orbitron',monospace"}}>⚔️ DAILY</div>
+            {Object.entries(CATS).map(([catKey,catVal])=>{
+              const items=[...tpl.filter(t=>t.frequency==="daily"&&t.category===catKey)].sort((a,b)=>a.name.localeCompare(b.name));
+              if(!items.length)return null;
+              return(<div key={catKey} style={{marginBottom:14}}>
+                <div style={{fontSize:9,color:catVal.color,letterSpacing:1.5,fontWeight:700,marginBottom:7,fontFamily:"'Orbitron',monospace",opacity:.85}}>{catVal.emoji} {catVal.label.toUpperCase()}</div>
+                {items.map(t=>{const d=DIFF[t.difficulty],cat=catVal;return(
+                  <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} onEdit={()=>openEdit(t)} extra={t.repeatable&&<Tag color="#fbbf24" label="🔁 REPEAT"/>}/>
+                );})}
+              </div>);
+            })}
           </>}
           {onceQ.length>0&&<>
             <div style={{fontSize:9,color:"#fb923c",letterSpacing:2,fontWeight:700,margin:"16px 0 10px",fontFamily:"'Orbitron',monospace"}}>✅ EINMALIG</div>
-            {(tplSort==='alpha'?[...onceQ].sort((a,b)=>a.name.localeCompare(b.name)):onceQ).map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,done=(plr.completedOnce||[]).includes(t.id);return(
+            {[...onceQ].sort((a,b)=>a.name.localeCompare(b.name)).map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,done=(plr.completedOnce||[]).includes(t.id);return(
               <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} onEdit={()=>openEdit(t)} done={done}
                 extra={<Tag color={done?"#4ade80":"#fb923c"} label={done?"✓ ERLEDIGT":"1x EINMALIG"}/>}
                 onReset={done?()=>doResetOnce(t.id):null}/>
