@@ -211,6 +211,22 @@ function isDblXpDay(dateStr){
 }
 function weekDays(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7,mon=new Date(t);mon.setDate(t.getDate()-o+weekOffset*7);return Array.from({length:7},(_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return ld(d);});}
 function weekStartFromOffset(weekOffset=0){const t=new Date(),o=(t.getDay()+6)%7,mon=new Date(t);mon.setDate(t.getDate()-o+weekOffset*7);return ld(mon);}
+
+function buildWeekHistory(completions, weeklyGoal){
+  // Group completions by weekStart, exclude current week
+  const ws=weekStartFromOffset(0);
+  const byWeek={};
+  completions.forEach(c=>{
+    if(c.weekStart&&c.weekStart!==ws){
+      if(!byWeek[c.weekStart])byWeek[c.weekStart]={xp:0};
+      byWeek[c.weekStart].xp+=c.earnedXp;
+    }
+  });
+  return Object.entries(byWeek)
+    .sort((a,b)=>a[0]<b[0]?-1:1)
+    .slice(-12)
+    .map(([weekStart,{xp}])=>({weekStart,xp,goal:weeklyGoal||500,reached:xp>=(weeklyGoal||500)}));
+}
 function monDays(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);const year=ref.getFullYear(),month=ref.getMonth(),f=new Date(year,month,1),la=new Date(year,month+1,0),pad=(f.getDay()+6)%7,arr=Array(pad).fill(null);for(let d=1;d<=la.getDate();d++)arr.push(ld(new Date(year,month,d)));return arr;}
 function monLabel(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);return{month:ref.getMonth(),year:ref.getFullYear()};}
 function weekLabel(weekOffset=0){const days=weekDays(weekOffset);const start=new Date(days[0]+"T12:00"),end=new Date(days[6]+"T12:00");const fmt=d=>d.toLocaleDateString("de-DE",{day:"numeric",month:"short"});const d=new Date(days[0]+"T12:00");d.setHours(0,0,0,0);d.setDate(d.getDate()+4-(d.getDay()||7));const kw=Math.ceil((((d-new Date(d.getFullYear(),0,1))/86400000)+1)/7);return{label:`KW ${kw}: ${fmt(start)} - ${fmt(end)}`,kw};}
@@ -289,7 +305,15 @@ export default function App() {
   const saved   = useMemo(()=>loadAll(),[]);
   const [tpl,   setTpl]   = useState(()=>migTpl(saved?.templates??INIT_TPL));
   const [comps, setComps] = useState(()=>saved?.completions??[]);
-  const [plr,   setPlr]   = useState(()=>mkPlayer(saved?.player));
+  const [plr,   setPlr]   = useState(()=>{
+    const p=mkPlayer(saved?.player);
+    const compsInit=saved?.completions??[];
+    // Backfill weekHistory from existing completions if empty
+    if(!(p.weekHistory||[]).length&&compsInit.length){
+      p.weekHistory=buildWeekHistory(compsInit,p.weeklyGoal||500);
+    }
+    return p;
+  });
   const [tab,   setTab]   = useState("today");
   const [profTab, setProfTab] = useState("hunter");
   const [flash, setFlash] = useState(null);         // {xp, key}
