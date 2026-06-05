@@ -394,6 +394,10 @@ export default function App() {
     let p={...plr};
     // Freeze regen: 1 per month, max 5
     if(p.lastFreezeMonth!==mon){p={...p,freezes:Math.min(5,(p.freezes||0)+1),lastFreezeMonth:mon};}
+    // Streak restore: one-time fix (streak was accidentally reset)
+    if((p.streak||0)<1&&(p.lastDate==='2026-06-05'||p.lastDate==='2026-06-04')){
+      p={...p,streak:9};
+    }
     // Streak check
     if(p.lastDate&&p.lastDate<yest){
       if(p.streak>0&&p.freezes>0){ setShowFreeze(true); }
@@ -826,7 +830,7 @@ export default function App() {
             </div>}
             <div style={{fontSize:12,color:"#334155",marginBottom:18}}>Freeze einsetzen um alle Streaks zu erhalten?</div>
             <div style={{display:"flex",gap:10}}>
-              <button onClick={doBreakStreak} style={{flex:1,padding:"11px",borderRadius:11,border:"1px solid #1e293b",background:"transparent",color:"#475569",fontFamily:"'Rajdhani',sans-serif",fontWeight:700,fontSize:13}}>Verlieren</button>
+              <button onClick={()=>setShowFreeze(false)} style={{flex:1,padding:"11px",borderRadius:11,border:"1px solid #1e293b",background:"transparent",color:"#475569",fontFamily:"'Rajdhani',sans-serif",fontWeight:700,fontSize:13}}>Abbrechen</button>
               <button onClick={doFreeze} style={{flex:1,padding:"11px",borderRadius:11,border:"none",background:"linear-gradient(135deg,#1d4ed8,#38bdf8)",color:"#fff",fontFamily:"'Orbitron',monospace",fontWeight:700,fontSize:11,letterSpacing:1}}>❄️ FREEZE ({plr.freezes})</button>
             </div>
           </div>
@@ -1029,17 +1033,13 @@ export default function App() {
             const isPast=weekOffset<0;
             const dispWs=wkDays[0];
             const histEntry=(plr.weekHistory||[]).find(h=>h.weekStart===dispWs);
-            const hasKnownGoal=isPast&&histEntry?.goal!=null;
-            // Past XP from history or live calculation; current week from weekC
+            const displayGoal=histEntry?.goal||plr.weeklyGoal||500;
+            // For past weeks use stored xp; for current week use live weekC
             const displayXP=isPast
               ?(histEntry?.xp||comps.filter(c=>c.weekStart===dispWs&&!c.isGhost&&c.earnedXp>0).reduce((s,c)=>s+c.earnedXp,0))
               :weekC.reduce((s,c)=>(!c.isGhost&&c.earnedXp>0)?s+c.earnedXp:s,0);
-            const displayGoal=hasKnownGoal?histEntry.goal:plr.weeklyGoal||500;
-            // For past weeks without stored goal: reached = true if any activity
-            const reached=isPast
-              ?(hasKnownGoal?(histEntry.reached??displayXP>=displayGoal):displayXP>0)
-              :displayXP>=displayGoal;
-            const pct=hasKnownGoal||!isPast?Math.min(100,Math.round((displayXP/displayGoal)*100)):null;
+            const pct=Math.min(100,Math.round((displayXP/displayGoal)*100));
+            const reached=isPast?(histEntry?.reached??pct>=100):pct>=100;
             const barColor=reached?"linear-gradient(90deg,#16a34a,#4ade80)":isPast?"linear-gradient(90deg,#991b1b,#f87171)":"linear-gradient(90deg,#1d4ed8,#38bdf8)";
             const borderColor=reached?"rgba(74,222,128,.3)":isPast?"rgba(248,113,113,.25)":"rgba(56,189,248,.18)";
             const bgColor=reached?"rgba(74,222,128,.06)":isPast?"rgba(248,113,113,.05)":"rgba(56,189,248,.06)";
@@ -1052,12 +1052,10 @@ export default function App() {
                     <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,color:numColor,letterSpacing:2}}>
                       WOCHENZIEL{reached?" ✓":isPast?" ✗":""}
                     </div>
-                    <div style={{fontSize:12,color:"#2d3f55",marginTop:2}}>{hasKnownGoal||!isPast?`${displayXP.toLocaleString()} / ${displayGoal.toLocaleString()} XP`:`${displayXP.toLocaleString()} XP`}</div>
+                    <div style={{fontSize:12,color:"#2d3f55",marginTop:2}}>{displayXP.toLocaleString()} / {displayGoal.toLocaleString()} XP</div>
                   </div>
                   <div style={{textAlign:"right"}}>
-                    <div style={{fontFamily:"'Orbitron',monospace",fontSize:28,fontWeight:900,color:numColor}}>
-                      {pct!==null?pct+"%":displayXP.toLocaleString()+" XP"}
-                    </div>
+                    <div style={{fontFamily:"'Orbitron',monospace",fontSize:28,fontWeight:900,color:numColor}}>{pct}%</div>
                     {weekOffset===0&&(editGoal
                       ?<div style={{display:"flex",gap:6,marginTop:4}}>
                         <input value={goalInput} onChange={e=>setGoalInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveGoal();if(e.key==="Escape")setEditGoal(false);}} autoFocus placeholder="500" style={{width:70,background:"#111929",border:"1px solid #38bdf8",borderRadius:8,padding:"4px 8px",color:"#38bdf8",fontSize:13,fontFamily:"'Orbitron',monospace",textAlign:"center"}}/>
@@ -1068,7 +1066,7 @@ export default function App() {
                   </div>
                 </div>
                 <div style={{height:6,background:"#0a1020",borderRadius:3,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:`${pct!==null?pct:reached?100:30}%`,background:barColor,boxShadow:`0 0 10px ${glowColor}`,borderRadius:3,transition:"width .8s cubic-bezier(.4,0,.2,1)"}}/>
+                  <div style={{height:"100%",width:`${pct}%`,background:barColor,boxShadow:`0 0 10px ${glowColor}`,borderRadius:3,transition:"width .8s cubic-bezier(.4,0,.2,1)"}}/>
                 </div>
               </div>
             );
