@@ -556,6 +556,7 @@ export default function App() {
     const nc=[...comps,{id,templateId:t.id,name:t.name,category:t.category,difficulty:t.difficulty,emoji:t.emoji,frequency:t.frequency,repeatable:t.repeatable||false,baseXp:base,streakBonus:bon,earnedXp:earned,date:today,weekStart:ws,ts:Date.now(),note:""}];
     let np={...plr};
     if(t.frequency==="once") np={...np,completedOnce:[...(np.completedOnce||[]),t.id]};
+    if(t.frequency==="boss"){const nt=tpl.map(x=>x.id===t.id?{...x,bossStatus:"done"}:x);setTpl(nt);}
     const yest=ld(new Date(Date.now()-86400000)); let s=np.streak;
     if(np.lastDate!==today){s=(np.lastDate===yest||!np.lastDate)?s+1:1;}
     np={...np,streak:s,lastDate:today};
@@ -948,29 +949,30 @@ export default function App() {
           </>}
           {/* Boss Quests */}
           {(()=>{
-            const bossQuests=tpl.filter(t=>t.frequency==="boss"&&t.bossStatus!=="done"&&t.bossStatus!=="failed");
+            const bossQuests=tpl.filter(t=>t.frequency==="boss"&&t.bossStatus!=="failed");
             if(!bossQuests.length)return null;
             return bossQuests.map(t=>{
               const d=DIFF[t.difficulty];
+              const done=t.bossStatus==="done";
               const deadline=t.bossDeadline?new Date(t.bossDeadline+"T23:59:59"):null;
               const daysLeft=deadline?Math.max(0,Math.ceil((deadline-new Date())/(86400000))):null;
               return(
-                <div key={t.id} style={{background:"linear-gradient(135deg,rgba(248,113,113,.12),rgba(248,113,113,.05))",border:"1px solid rgba(248,113,113,.5)",borderRadius:16,padding:"16px",marginBottom:12,animation:"slideUp .3s ease"}}>
+                <div key={t.id} style={{background:done?"rgba(12,18,35,.7)":"linear-gradient(135deg,rgba(248,113,113,.12),rgba(248,113,113,.05))",border:`1px solid ${done?"rgba(74,222,128,.2)":"rgba(248,113,113,.5)"}`,borderRadius:16,padding:"16px",marginBottom:12,animation:"slideUp .3s ease",opacity:done?.6:1}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
                       <div style={{fontSize:28}}>{t.emoji}</div>
                       <div>
-                        <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:"#f87171",letterSpacing:2,fontWeight:700}}>BOSS QUEST</div>
-                        <div style={{fontWeight:700,fontSize:16,color:"#fee2e2",marginTop:2}}>{t.name}</div>
-                        <div style={{fontSize:10,color:"#f87171",marginTop:2}}>x3 XP · {d.label}</div>
+                        <div style={{fontFamily:"'Orbitron',monospace",fontSize:9,color:done?"#4ade80":"#f87171",letterSpacing:2,fontWeight:700}}>BOSS QUEST</div>
+                        <div style={{fontWeight:700,fontSize:16,color:done?"#64748b":"#fee2e2",marginTop:2,textDecoration:done?"line-through":"none"}}>{t.name}</div>
+                        <div style={{fontSize:10,color:done?"#334155":"#f87171",marginTop:2}}>{done?"✓ Diese Woche erledigt":"x3 XP · "+d.label}</div>
                       </div>
                     </div>
-                    {daysLeft!==null&&<div style={{textAlign:"center",flexShrink:0}}>
+                    {!done&&daysLeft!==null&&<div style={{textAlign:"center",flexShrink:0}}>
                       <div style={{fontFamily:"'Orbitron',monospace",fontSize:22,fontWeight:900,color:daysLeft<=2?"#f87171":"#fbbf24",lineHeight:1}}>{daysLeft}</div>
                       <div style={{fontSize:8,color:"#7f1d1d",letterSpacing:1,fontWeight:700}}>{daysLeft===1?"TAG":"TAGE"}</div>
                     </div>}
                   </div>
-                  <button className="tap" onClick={()=>doComplete(t)} style={{width:"100%",padding:"11px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#991b1b,#f87171)",color:"#fff",fontFamily:"'Orbitron',monospace",fontWeight:700,fontSize:11,letterSpacing:1}}>QUEST ABSCHLIESSEN</button>
+                  <button disabled={done} style={{width:"100%",padding:"11px",borderRadius:10,border:"none",background:done?"#0d1628":"linear-gradient(135deg,#991b1b,#f87171)",color:done?"#1e293b":"#fff",fontFamily:"'Orbitron',monospace",fontWeight:700,fontSize:11,letterSpacing:1,cursor:done?"default":"pointer"}} onClick={done?undefined:()=>doComplete(t)}>{done?"✓ ABGESCHLOSSEN":"QUEST ABSCHLIESSEN"}</button>
                 </div>
               );
             });
@@ -1166,6 +1168,14 @@ export default function App() {
                 );})}
               </div>);
             })}
+          </>}
+          {tpl.filter(t=>t.frequency==="boss").length>0&&<>
+            <div style={{fontSize:9,color:"#f87171",letterSpacing:2,fontWeight:700,margin:"16px 0 10px",fontFamily:"'Orbitron',monospace"}}>⚠️ BOSS</div>
+            {[...tpl.filter(t=>t.frequency==="boss")].sort((a,b)=>a.name.localeCompare(b.name)).map(t=>{const d=DIFF[t.difficulty],cat=CATS[t.category]??CATS.sonstige,done=t.bossStatus==="done";return(
+              <TplRow key={t.id} t={t} d={d} cat={cat} onDelete={()=>doDelete(t.id)} onEdit={()=>openEdit(t)} done={done}
+                extra={<Tag color={done?"#4ade80":"#f87171"} label={done?"✓ ERLEDIGT":"⚠️ BOSS · x3 XP"}/>}
+                onReset={done?()=>{const nt=tpl.map(x=>x.id===t.id?{...x,bossStatus:"active"}:x);setTpl(nt);saveAll(nt,comps,plr);}:null}/>
+            );})}
           </>}
           {onceQ.length>0&&<>
             <div style={{fontSize:9,color:"#fb923c",letterSpacing:2,fontWeight:700,margin:"16px 0 10px",fontFamily:"'Orbitron',monospace"}}>✅ EINMALIG</div>
