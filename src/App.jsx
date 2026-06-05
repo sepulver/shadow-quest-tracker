@@ -163,6 +163,39 @@ const SEASONS = [
   { id:"winter_warrior",  name:"Winter Warrior",   emoji:"❄️", months:[12],   days:null,  xpMult:1.2,  color:"#7dd3fc", desc:"Dezember: +20% XP auf alle Quests" },
   { id:"spring_awakening",name:"Spring Awakening", emoji:"🌸", months:[3,4],  days:null,  xpMult:1.15, color:"#f9a8d4", desc:"Frühling: +15% XP" },
 ];
+const MONTHLY_CHALLENGES = [
+  { id:"fitness_20",  emoji:"⚔️",  title:"Warrior Month",    desc:"Schließe 20 Fitness-Quests ab",      type:"cat",    cat:"fitness",  target:20 },
+  { id:"haushalt_25", emoji:"🏠",  title:"Clean Sweep",      desc:"Schließe 25 Haushalt-Quests ab",     type:"cat",    cat:"haushalt", target:25 },
+  { id:"familie_20",  emoji:"❤️",  title:"Family First",     desc:"Schließe 20 Familie-Quests ab",      type:"cat",    cat:"familie",  target:20 },
+  { id:"streak_7",    emoji:"🔥",  title:"Consistency Week", desc:"Erreiche einen 7-Tage Streak",       type:"streak", target:7  },
+  { id:"streak_14",   emoji:"🔥",  title:"Iron Will",        desc:"Erreiche einen 14-Tage Streak",      type:"streak", target:14 },
+  { id:"total_50",    emoji:"🏅",  title:"Quest Blitz",      desc:"Schließe 50 Quests diesen Monat ab", type:"month",  target:50 },
+  { id:"total_75",    emoji:"💎",  title:"Elite Grinder",    desc:"Schließe 75 Quests diesen Monat ab", type:"month",  target:75 },
+  { id:"xp_2000",     emoji:"✨",  title:"XP Rush",          desc:"Sammle 2.000 XP diesen Monat",       type:"monthxp",target:2000 },
+  { id:"xp_5000",     emoji:"🌟",  title:"Power Surge",      desc:"Sammle 5.000 XP diesen Monat",       type:"monthxp",target:5000 },
+  { id:"einkauf_10",  emoji:"🛒",  title:"Supply Run",       desc:"Schließe 10 Einkauf-Quests ab",      type:"cat",    cat:"einkauf",  target:10 },
+  { id:"hard_15",     emoji:"💀",  title:"Hard Mode",        desc:"Schließe 15 Hard Quests ab",         type:"diff",   diff:"hard",    target:15 },
+  { id:"allcat",      emoji:"🌈",  title:"All-Rounder",      desc:"Schließe in jeder Kategorie mind. 5 Quests ab", type:"allcat", target:5 },
+];
+function getMonthlyChallenge(dateStr){
+  const d=new Date(dateStr+"T12:00");
+  const key=d.getFullYear()*100+(d.getMonth()+1);
+  let h=0; const s=String(key); for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;
+  return MONTHLY_CHALLENGES[h%MONTHLY_CHALLENGES.length];
+}
+function calcChallengeProgress(challenge, comps, player, monPrefix){
+  const mc=comps.filter(c=>c.date.startsWith(monPrefix)&&!c.isGhost&&c.earnedXp>0);
+  if(challenge.type==="cat") return mc.filter(c=>c.category===challenge.cat).length;
+  if(challenge.type==="diff") return mc.filter(c=>c.difficulty===challenge.diff).length;
+  if(challenge.type==="month") return mc.length;
+  if(challenge.type==="monthxp") return mc.reduce((s,c)=>s+c.earnedXp,0);
+  if(challenge.type==="streak") return player.streak||0;
+  if(challenge.type==="allcat"){
+    const cats=["fitness","haushalt","familie","einkauf","sonstige"];
+    return Math.min(...cats.map(cat=>mc.filter(c=>c.category===cat).length));
+  }
+  return 0;
+}
 function getActiveSeason(dateStr){
   const d=new Date(dateStr+"T12:00");
   const m=d.getMonth()+1, day=d.getDate();
@@ -239,8 +272,8 @@ function buildWeekHistory(completions){
 function monDays(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);const year=ref.getFullYear(),month=ref.getMonth(),f=new Date(year,month,1),la=new Date(year,month+1,0),pad=(f.getDay()+6)%7,arr=Array(pad).fill(null);for(let d=1;d<=la.getDate();d++)arr.push(ld(new Date(year,month,d)));return arr;}
 function monLabel(monthOffset=0){const ref=new Date();ref.setDate(1);ref.setMonth(ref.getMonth()+monthOffset);return{month:ref.getMonth(),year:ref.getFullYear()};}
 function weekLabel(weekOffset=0){const days=weekDays(weekOffset);const start=new Date(days[0]+"T12:00"),end=new Date(days[6]+"T12:00");const fmt=d=>d.toLocaleDateString("de-DE",{day:"numeric",month:"short"});const d=new Date(days[0]+"T12:00");d.setHours(0,0,0,0);d.setDate(d.getDate()+4-(d.getDay()||7));const kw=Math.ceil((((d-new Date(d.getFullYear(),0,1))/86400000)+1)/7);return{label:`KW ${kw}: ${fmt(start)} - ${fmt(end)}`,kw};}
-function migTpl(arr){return arr.map((t,i)=>({repeatable:false,activeDays:[],weekLimit:0,...t,frequency:t.frequency==="weekly"?"daily":t.frequency??(t.recurring?"daily":"daily"),weekLimit:t.frequency==="weekly"?Math.max(t.weekLimit||0,1):t.weekLimit||0,order:t.order??i}));}
-function mkPlayer(p={}){const base={name:"Tim",streak:0,lastDate:null,completedOnce:[],weeklyGoal:500,freezes:1,lastFreezeMonth:null,achievements:[],usedFreeze:false,weekHistory:[],weekGoalStreak:0,weekGoalBonusPaid:null,...p};base.achievements=migAchs(base.achievements);return base;}
+function migTpl(arr){return arr.map((t,i)=>({repeatable:false,activeDays:[],weekLimit:0,pauseUntil:null,...t,frequency:t.frequency==="weekly"?"daily":t.frequency??(t.recurring?"daily":"daily"),weekLimit:t.frequency==="weekly"?Math.max(t.weekLimit||0,1):t.weekLimit||0,order:t.order??i}));}
+function mkPlayer(p={}){const base={name:"Tim",streak:0,lastDate:null,completedOnce:[],weeklyGoal:500,freezes:1,lastFreezeMonth:null,achievements:[],usedFreeze:false,weekHistory:[],weekGoalStreak:0,weekGoalBonusPaid:null,monthChallengePaid:null,...p};base.achievements=migAchs(base.achievements);return base;}
 
 // Returns consecutive days streak for a specific template up to (not including) today
 function questStreak(comps, templateId, today, template) {
@@ -341,6 +374,8 @@ export default function App() {
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(null);
   const [reorderMode, setReorderMode] = useState(false);
+  const [swipeId,    setSwipeId]    = useState(null);   // quest id being swiped
+  const [pauseSheet, setPauseSheet] = useState(null);   // quest id for pause bottom sheet
   const [editingId,   setEditingId]   = useState(null);
   const noteTimer = useRef(null);
 
@@ -391,6 +426,7 @@ export default function App() {
   const todayDow   =useMemo(()=>(new Date().getDay()+6)%7,[]);// 0=Mo..6=So
   const dailyQ     =useMemo(()=>tpl.filter(t=>{
     if(t.frequency!=="daily")return false;
+    if(t.pauseUntil&&t.pauseUntil>=today)return false; // paused
     if(t.activeDays&&t.activeDays.length>0&&!t.activeDays.includes(todayDow))return false;
     if(t.weekLimit>0){
       const doneThisWeek=comps.filter(c=>c.templateId===t.id&&c.weekStart===ws).length;
@@ -477,6 +513,17 @@ export default function App() {
         newComps=[...newComps,bonusComp];
       }
     }
+    // Monthly challenge bonus
+    const monChal=getMonthlyChallenge(today);
+    const monPaidKey=MONTH()+"-"+monChal.id;
+    if(newPlr.monthChallengePaid!==monPaidKey){
+      const prog=calcChallengeProgress(monChal,newComps,newPlr,MONTH());
+      if(prog>=monChal.target){
+        const chalComp={id:"mcb_"+monPaidKey,templateId:"_monthchallenge",name:"Monats-Challenge: "+monChal.title,category:"sonstige",difficulty:"hard",emoji:monChal.emoji,frequency:"bonus",repeatable:false,baseXp:200,streakBonus:0,earnedXp:200,date:today,weekStart:ws,ts:Date.now(),note:""};
+        newComps=[...newComps,chalComp];
+        newPlr={...newPlr,monthChallengePaid:monPaidKey};
+      }
+    }
     // Level-up detection
     const newTotalXP=newComps.reduce((s,c)=>s+c.earnedXp,0);
     const newLvl=lvlInfo(newTotalXP);
@@ -541,6 +588,18 @@ export default function App() {
     afterComplete(comps,np);
   }
   function doBreakStreak(){const np={...plr,streak:0};setPlr(np);saveAll(tpl,comps,np);setShowFreeze(false);}
+
+  function doPause(tid, days){
+    const d=new Date(); d.setDate(d.getDate()+days);
+    const until=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+    const nt=tpl.map(t=>t.id===tid?{...t,pauseUntil:until}:t);
+    setTpl(nt); saveAll(nt,comps,plr); setPauseSheet(null); setSwipeId(null);
+  }
+
+  function doUnpause(tid){
+    const nt=tpl.map(t=>t.id===tid?{...t,pauseUntil:null}:t);
+    setTpl(nt); saveAll(nt,comps,plr);
+  }
 
   const EMPTY_Q={name:'',category:'sonstige',difficulty:'normal',emoji:'📋',frequency:'daily',repeatable:false,activeDays:[],weekLimit:0,noteEnabled:false};
   function openAdd(){
@@ -710,6 +769,24 @@ export default function App() {
       </div>}
 
       {/* Note Input */}
+      {pauseSheet&&(()=>{const pt=tpl.find(t=>t.id===pauseSheet);return pt&&(
+        <div style={{position:"fixed",inset:0,zIndex:500,background:"rgba(0,0,0,.7)",backdropFilter:"blur(8px)"}} onClick={()=>setPauseSheet(null)}>
+          <div onClick={e=>e.stopPropagation()} style={{position:"absolute",bottom:0,left:0,right:0,maxWidth:480,margin:"0 auto",background:"#080d1c",borderRadius:"20px 20px 0 0",border:"1px solid rgba(248,113,113,.3)",borderBottom:"none",padding:"22px 18px 40px",animation:"slideUp .2s ease"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
+              <span style={{fontSize:22}}>{pt.emoji}</span>
+              <div>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:10,color:"#f87171",letterSpacing:2,fontWeight:700}}>QUEST PAUSIEREN</div>
+                <div style={{fontSize:13,color:"#e2e8f0",fontWeight:600,marginTop:2}}>{pt.name}</div>
+              </div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {[{l:"1 Tag",d:1},{l:"2 Tage",d:2},{l:"3 Tage",d:3},{l:"1 Woche",d:7},{l:"2 Wochen",d:14},{l:"1 Monat",d:30}].map(({l,d})=>(
+                <button key={d} onClick={()=>doPause(pt.id,d)} style={{padding:"13px",borderRadius:11,border:"1px solid rgba(248,113,113,.3)",background:"rgba(248,113,113,.08)",color:"#fca5a5",fontFamily:"'Rajdhani',sans-serif",fontWeight:700,fontSize:14}}>⏸ {l}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      );})()}
       {pendingNote&&<div style={{position:"fixed",bottom:80,left:0,right:0,zIndex:300,maxWidth:480,margin:"0 auto",padding:"0 16px",animation:"slideUp .2s ease"}}>
         <div style={{background:"#0f172a",border:"1px solid rgba(56,189,248,.3)",borderRadius:14,padding:"12px 14px",display:"flex",gap:10,alignItems:"center",boxShadow:"0 0 20px rgba(0,0,0,.5)"}}>
           <span style={{fontSize:16}}>📝</span>
@@ -826,6 +903,30 @@ export default function App() {
               </div>
             </div>
           );})()}
+          {(()=>{
+            const ch=getMonthlyChallenge(today);
+            const prog=calcChallengeProgress(ch,comps,plr,MONTH());
+            const pct=Math.min(100,Math.round((prog/ch.target)*100));
+            const done=plr.monthChallengePaid===(MONTH()+"-"+ch.id);
+            return(
+              <div style={{marginBottom:16,padding:"12px 14px",background:done?"rgba(74,222,128,.06)":"rgba(192,132,252,.05)",borderRadius:12,border:`1px solid ${done?"rgba(74,222,128,.2)":"rgba(192,132,252,.15)"}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <div style={{display:"flex",alignItems:"center",gap:7}}>
+                    <span style={{fontSize:16}}>{ch.emoji}</span>
+                    <div>
+                      <div style={{fontFamily:"'Orbitron',monospace",fontSize:8,color:done?"#4ade80":"#c084fc",letterSpacing:1.5,fontWeight:700}}>{done?"✓ ABGESCHLOSSEN":"MONATS-CHALLENGE"}</div>
+                      <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,marginTop:1}}>{ch.title}</div>
+                    </div>
+                  </div>
+                  <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,fontWeight:900,color:done?"#4ade80":"#c084fc"}}>{pct}%</div>
+                </div>
+                <div style={{height:4,background:"#0a1020",borderRadius:2,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:pct+"%",background:done?"linear-gradient(90deg,#16a34a,#4ade80)":"linear-gradient(90deg,#7c3aed,#c084fc)",borderRadius:2,transition:"width .4s ease"}}/>
+                </div>
+                <div style={{fontSize:10,color:"#475569",marginTop:5}}>{ch.desc} · {prog}/{ch.target}{done&&" · +200 XP erhalten!"}</div>
+              </div>
+            );
+          })()}
           {allDone&&<div style={{background:"linear-gradient(135deg,rgba(56,189,248,.1),rgba(192,132,252,.1))",border:"1px solid rgba(56,189,248,.38)",borderRadius:14,padding:"14px 18px",marginBottom:18,textAlign:"center",animation:"slideUp .4s ease"}}>
             <div style={{fontSize:24}}>🏆</div>
             <div style={{fontFamily:"'Orbitron',monospace",fontSize:12,fontWeight:700,color:"#38bdf8",letterSpacing:2,marginTop:5}}>ALL QUESTS COMPLETE!</div>
@@ -890,17 +991,28 @@ export default function App() {
             </div>
           ):null;})()}
           {reorderMode&&<div style={{fontSize:10,color:"#334155",textAlign:"center",marginBottom:10,letterSpacing:.5}}>Reihenfolge mit den Pfeilen anpassen</div>}
-          {dailyQ.length===0?<EmptyState/>:dailyQ.filter(t=>t.frequency==="daily"&&(!catFilter||t.category===catFilter)).map((t,i,arr)=>(
-            <div key={t.id} style={{position:"relative",borderRadius:14,background:reorderMode?"rgba(56,189,248,.03)":"transparent",display:"flex",alignItems:"center",gap:6,marginBottom:reorderMode?6:0}}>
+          {dailyQ.length===0?<EmptyState/>:dailyQ.filter(t=>t.frequency==="daily"&&(!catFilter||t.category===catFilter)).map((t,i,arr)=>{
+            const isSwiped=swipeId===t.id&&!reorderMode;
+            return(
+            <div key={t.id} style={{position:"relative",borderRadius:14,background:reorderMode?"rgba(56,189,248,.03)":"transparent",display:"flex",alignItems:"center",gap:6,marginBottom:reorderMode?6:0,overflow:"hidden"}}>
+              {/* Swipe-left pause button */}
+              {!reorderMode&&<div style={{position:"absolute",right:0,top:0,bottom:0,width:72,background:"linear-gradient(135deg,#7f1d1d,#f87171)",borderRadius:"0 14px 14px 0",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,cursor:"pointer",zIndex:1}} onClick={()=>setPauseSheet(t.id)}>
+                <span style={{fontSize:18}}>⏸</span>
+                <span style={{fontSize:8,color:"#fff",fontWeight:700,letterSpacing:.5}}>PAUSE</span>
+              </div>}
               {reorderMode&&<div style={{display:"flex",flexDirection:"column",gap:3,flexShrink:0}}>
                 <button onClick={()=>{if(i===0)return;const o=[...tpl];const ai=o.findIndex(x=>x.id===arr[i-1].id),bi=o.findIndex(x=>x.id===t.id);[o[ai],o[bi]]=[o[bi],o[ai]];setTpl(o);saveAll(o,comps,plr);}} disabled={i===0} style={{background:i===0?"transparent":"rgba(56,189,248,.12)",border:`1px solid ${i===0?"#0d1628":"rgba(56,189,248,.3)"}`,color:i===0?"#1a2840":"#38bdf8",borderRadius:6,width:26,height:26,fontSize:13,lineHeight:1,cursor:i===0?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▲</button>
                 <button onClick={()=>{if(i===arr.length-1)return;const o=[...tpl];const ai=o.findIndex(x=>x.id===arr[i+1].id),bi=o.findIndex(x=>x.id===t.id);[o[ai],o[bi]]=[o[bi],o[ai]];setTpl(o);saveAll(o,comps,plr);}} disabled={i===arr.length-1} style={{background:i===arr.length-1?"transparent":"rgba(56,189,248,.12)",border:`1px solid ${i===arr.length-1?"#0d1628":"rgba(56,189,248,.3)"}`,color:i===arr.length-1?"#1a2840":"#38bdf8",borderRadius:6,width:26,height:26,fontSize:13,lineHeight:1,cursor:i===arr.length-1?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>▼</button>
               </div>}
-              <div style={{flex:1}}>
-                {t.repeatable?<RepeatRow t={t}/>:<NormalRow t={t} done={doneIds.has(t.id)} onToggle={()=>!reorderMode&&(doneIds.has(t.id)?doUndo(t.id):doComplete(t))}/>}
+              <div style={{flex:1,transform:isSwiped?"translateX(-72px)":"translateX(0)",transition:"transform .25s ease",position:"relative",zIndex:2}}
+                onTouchStart={e=>{if(reorderMode)return;e.currentTarget._tx=e.touches[0].clientX;e.currentTarget._ty=e.touches[0].clientY;e.currentTarget._swiping=false;}}
+                onTouchMove={e=>{if(reorderMode)return;const dx=e.touches[0].clientX-e.currentTarget._tx;const dy=e.touches[0].clientY-(e.currentTarget._ty||0);if(Math.abs(dy)>Math.abs(dx))return;if(dx<-10)e.currentTarget._swiping=true;if(e.currentTarget._swiping){e.preventDefault();const clamped=Math.max(-72,Math.min(0,dx));e.currentTarget.style.transform=`translateX(${clamped}px)`;}}}
+                onTouchEnd={e=>{if(reorderMode)return;const dx=e.changedTouches[0].clientX-e.currentTarget._tx;e.currentTarget.style.transform="";if(dx<-50){setSwipeId(t.id);}else{setSwipeId(null);}}}
+              >
+                {t.repeatable?<RepeatRow t={t}/>:<NormalRow t={t} done={doneIds.has(t.id)} onToggle={()=>{if(!reorderMode){if(isSwiped){setSwipeId(null);}else{doneIds.has(t.id)?doUndo(t.id):doComplete(t);}}}}/>}
               </div>
             </div>
-          ))}
+          );})}
         </>}
 
         {/* ═══ WEEK ════════════════════════════════════════════════════════════ */}
@@ -1477,7 +1589,7 @@ function SecHead({label,color,count,sub,onAdd,btnColor}){return<div style={{disp
 </div>;}
 function HR(){return<div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(56,189,248,.12),transparent)",margin:"6px 0 18px"}}/>;}
 function EmptyState(){return<div style={{textAlign:"center",padding:"40px 20px"}}><div style={{fontSize:40}}>⚔️</div><div style={{fontFamily:"'Orbitron',monospace",fontSize:11,color:"#1a2540",marginTop:12,letterSpacing:2}}>NO ACTIVE QUESTS</div></div>;}
-function TplRow({t,d,cat,onDelete,onEdit,done=false,extra,onReset}){return(
+function TplRow({t,d,cat,onDelete,onEdit,done=false,extra,onReset,onUnpause}){return(
   <div style={{background:"rgba(12,18,40,.9)",border:`1px solid ${done?"rgba(74,222,128,.15)":"#1a2840"}`,borderRadius:13,padding:"13px 15px",marginBottom:10,display:"flex",alignItems:"center",gap:12,opacity:done?.65:1}}>
     <div style={{fontSize:22}}>{t.emoji}</div>
     <div style={{flex:1}}>
@@ -1489,6 +1601,7 @@ function TplRow({t,d,cat,onDelete,onEdit,done=false,extra,onReset}){return(
       </div>
     </div>
     <div style={{display:"flex",gap:6}}>
+      {onUnpause&&<button onClick={onUnpause} style={{background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.3)",color:"#f87171",borderRadius:9,padding:"8px 10px",fontSize:11,flexShrink:0,fontWeight:700}}>▶</button>}
       {onReset&&<button onClick={onReset} style={{background:"rgba(56,189,248,.1)",border:"1px solid rgba(56,189,248,.3)",color:"#38bdf8",borderRadius:9,padding:"8px 10px",fontSize:12,flexShrink:0}}>↺</button>}
       {onEdit&&<button onClick={onEdit} style={{background:"rgba(56,189,248,.08)",border:"1px solid rgba(56,189,248,.25)",color:"#38bdf8",borderRadius:9,padding:"9px 11px",fontSize:14,flexShrink:0}}>✏️</button>}
     </div>
