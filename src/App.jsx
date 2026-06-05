@@ -351,16 +351,24 @@ export default function App() {
   const [plr,   setPlr]   = useState(()=>{
     const p=mkPlayer(saved?.player);
     const compsInit=saved?.completions??[];
-    // Backfill weekHistory from existing completions if empty OR if goals look wrong (old default 500)
-    // Always rebuild from completions to ensure correctness
+    // Backfill weekHistory from existing completions, preserve existing goal/reached values
     if(compsInit.length){
       const rebuilt=buildWeekHistory(compsInit);
-      // Merge: keep goal values from existing history if present
       const existing=p.weekHistory||[];
-      p.weekHistory=rebuilt.map(r=>{
+      // Merge past weeks: keep saved goal values
+      const merged=rebuilt.map(r=>{
         const ex=existing.find(e=>e.weekStart===r.weekStart);
         return ex&&ex.goal?{...r,goal:ex.goal,reached:ex.reached??r.reached}:r;
       });
+      // Always preserve the current week entry from saved history (including user-set goal)
+      const curWs=weekStartFromOffset(0);
+      const savedCurWeek=existing.find(e=>e.weekStart===curWs);
+      if(savedCurWeek&&!merged.find(e=>e.weekStart===curWs)){
+        merged.push(savedCurWeek);
+      }
+      p.weekHistory=merged;
+      // Preserve user-set weeklyGoal from saved player
+      if(saved?.player?.weeklyGoal) p.weeklyGoal=saved.player.weeklyGoal;
     }
     return p;
   });
