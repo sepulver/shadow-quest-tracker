@@ -347,16 +347,33 @@ export default function App() {
   // Persist
   useEffect(()=>{ saveAll(tpl,comps,plr); },[tpl,comps,plr]);
 
-  // On mount: streak check, freeze regen, show freeze prompt
+  // On mount: streak check, freeze regen, show freeze prompt, auto weekly goal
   useEffect(()=>{
     const yest=ld(new Date(Date.now()-86400000)), mon=MONTH();
+    const curWs=wkStart();
     let p={...plr};
-    // Freeze regen: 1 per month, max 2
+    // Freeze regen: 1 per month, max 5
     if(p.lastFreezeMonth!==mon){p={...p,freezes:Math.min(5,(p.freezes||0)+1),lastFreezeMonth:mon};}
     // Streak check
     if(p.lastDate&&p.lastDate<yest){
       if(p.streak>0&&p.freezes>0){ setShowFreeze(true); }
       else { p={...p,streak:0}; }
+    }
+    // Auto weekly goal: compute from prev week on new week start
+    const hist=[...(p.weekHistory||[])];
+    const hasCurrentWeek=hist.some(h=>h.weekStart===curWs);
+    if(!hasCurrentWeek&&hist.length>0){
+      const prev=hist[hist.length-1];
+      const prevXP=prev.xp||0;
+      const prevGoal=prev.goal||p.weeklyGoal||500;
+      let newGoal;
+      if(prevXP>=prevGoal){ newGoal=Math.round(prevGoal*1.1); }         // reached: +10%
+      else if(prevXP>=prevGoal*0.8){ newGoal=prevGoal; }                // close: keep same
+      else { newGoal=Math.max(300,Math.round(prevGoal*0.9)); }           // missed badly: -10%
+      newGoal=Math.min(newGoal,Math.round(prevGoal*1.2));                // cap at +20%
+      // Add current week placeholder
+      hist.push({weekStart:curWs,xp:0,goal:newGoal,reached:false});
+      p={...p,weeklyGoal:newGoal,weekHistory:hist};
     }
     setPlr(p);
   },[]);// eslint-disable-line
@@ -423,16 +440,26 @@ export default function App() {
       newPlr = {...newPlr, achievements:achs};
       setAchFlash({ach:updates[0].ach, tier:updates[0].tier, newLevel:updates[0].newLevel, key:Date.now()});
     }
-    // Track weekly goal history — record prev week when week rolls over
+    // Track weekly goal history — update current week + record prev when rolling over
+    const curWeekComps=newComps.filter(c=>c.weekStart===ws&&!c.isGhost&&c.earnedXp>0);
+    const curXPForHist=curWeekComps.reduce((s,c)=>s+c.earnedXp,0);
+    let hist=[...(newPlr.weekHistory||[])];
+    const curHistIdx=hist.findIndex(h=>h.weekStart===ws);
+    const curGoal=newPlr.weeklyGoal||500;
+    if(curHistIdx>=0){ hist[curHistIdx]={...hist[curHistIdx],xp:curXPForHist,reached:curXPForHist>=curGoal}; }
+    else { hist.push({weekStart:ws,xp:curXPForHist,goal:curGoal,reached:curXPForHist>=curGoal}); }
+    if(hist.length>13) hist.splice(0,hist.length-13);
+    newPlr={...newPlr,weekHistory:hist};
+    // Record prev week when week rolls over
     const prevWs = newComps.length>1 ? newComps[newComps.length-2]?.weekStart : null;
     if(prevWs && prevWs !== ws){
-      const prevXP = newComps.filter(c=>c.weekStart===prevWs).reduce((s,c)=>s+c.earnedXp,0);
-      const prevGoal = newPlr.weeklyGoal||500;
-      const hist = [...(newPlr.weekHistory||[])];
-      if(!hist.find(h=>h.weekStart===prevWs)){
-        hist.push({weekStart:prevWs, xp:prevXP, goal:prevGoal, reached:prevXP>=prevGoal});
-        if(hist.length>12) hist.splice(0, hist.length-12); // keep last 12 weeks
-        newPlr = {...newPlr, weekHistory:hist};
+      const prevXP = newComps.filter(c=>c.weekStart===prevWs&&!c.isGhost&&c.earnedXp>0).reduce((s,c)=>s+c.earnedXp,0);
+      const prevHist=[...(newPlr.weekHistory||[])];
+      if(!prevHist.find(h=>h.weekStart===prevWs)){
+        const prevGoal=curGoal;
+        prevHist.push({weekStart:prevWs,xp:prevXP,goal:prevGoal,reached:prevXP>=prevGoal});
+        if(prevHist.length>13) prevHist.splice(0,prevHist.length-13);
+        newPlr={...newPlr,weekHistory:prevHist};
       }
     }
     // Weekly goal bonus: pay out once per week when goal first reached
@@ -567,7 +594,13 @@ export default function App() {
   function saveGoal(){
     const g=parseInt(goalInput);
     if(isNaN(g)||g<50)return;
-    const np={...plr,weeklyGoal:g}; setPlr(np); saveAll(tpl,comps,np); setEditGoal(false);
+    // Update current week's history entry with new goal
+    const hist=[...(plr.weekHistory||[])];
+    const curIdx=hist.findIndex(h=>h.weekStart===ws);
+    const curXP=weekC.reduce((s,c)=>s+c.earnedXp,0);
+    if(curIdx>=0){ hist[curIdx]={...hist[curIdx],goal:g,reached:curXP>=g}; }
+    else { hist.push({weekStart:ws,xp:curXP,goal:g,reached:curXP>=g}); }
+    const np={...plr,weeklyGoal:g,weekHistory:hist}; setPlr(np); saveAll(tpl,comps,np); setEditGoal(false);
   }
 
   // ── Sub-Components ───────────────────────────────────────────────────────────
@@ -689,18 +722,34 @@ export default function App() {
       </div>}
 
       {/* Freeze Prompt */}
-      {showFreeze&&<div style={{position:"fixed",inset:0,zIndex:400,background:"rgba(0,0,0,.85)",backdropFilter:"blur(12px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}}>
-        <div style={{background:"#0a0f1e",border:"1px solid rgba(56,189,248,.3)",borderRadius:20,padding:"30px 24px",maxWidth:360,width:"100%",textAlign:"center"}}>
-          <div style={{fontSize:48,marginBottom:12}}>❄️</div>
-          <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,color:"#38bdf8",letterSpacing:2,marginBottom:8}}>STREAK IN GEFAHR</div>
-          <div style={{fontSize:14,color:"#94a3b8",marginBottom:6}}>Du hast gestern keine Quest erledigt.</div>
-          <div style={{fontSize:13,color:"#475569",marginBottom:24}}>Streak-Freeze einsetzen um deinen <span style={{color:"#fbbf24",fontWeight:700}}>{plr.streak}-Tage Streak</span> zu retten?</div>
-          <div style={{display:"flex",gap:10}}>
-            <button onClick={doBreakStreak} style={{flex:1,padding:"12px",borderRadius:11,border:"1px solid #1e293b",background:"transparent",color:"#475569",fontFamily:"'Rajdhani',sans-serif",fontWeight:700,fontSize:13}}>Streak verlieren</button>
-            <button onClick={doFreeze} style={{flex:1,padding:"12px",borderRadius:11,border:"none",background:"linear-gradient(135deg,#1d4ed8,#38bdf8)",color:"#fff",fontFamily:"'Orbitron',monospace",fontWeight:700,fontSize:11,letterSpacing:1}}>❄️ FREEZE ({plr.freezes})</button>
+      {showFreeze&&(()=>{
+        const yest=ld(new Date(Date.now()-86400000));
+        const endangered=tpl.filter(t=>t.frequency==="daily").map(t=>({t,s:questStreak(comps,t.id,yest,t)})).filter(x=>x.s>=2);
+        return(
+        <div style={{position:"fixed",inset:0,zIndex:400,background:"rgba(0,0,0,.85)",backdropFilter:"blur(12px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}}>
+          <div style={{background:"#0a0f1e",border:"1px solid rgba(56,189,248,.3)",borderRadius:20,padding:"28px 22px",maxWidth:360,width:"100%",textAlign:"center"}}>
+            <div style={{fontSize:42,marginBottom:10}}>❄️</div>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,color:"#38bdf8",letterSpacing:2,marginBottom:6}}>STREAK FREEZE</div>
+            <div style={{fontSize:13,color:"#94a3b8",marginBottom:10}}>Gestern keine Quest erledigt — dein <span style={{color:"#fbbf24",fontWeight:700}}>{plr.streak}-Tage Streak</span> ist in Gefahr.</div>
+            {endangered.length>0&&<div style={{background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.2)",borderRadius:11,padding:"10px 12px",marginBottom:14,textAlign:"left"}}>
+              <div style={{fontSize:9,color:"#f87171",letterSpacing:1.5,fontWeight:700,marginBottom:6,fontFamily:"'Orbitron',monospace"}}>GEFÄHRDETE STREAKS</div>
+              {endangered.map(({t,s})=>(
+                <div key={t.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                  <span style={{fontSize:14}}>{t.emoji}</span>
+                  <span style={{fontSize:12,color:"#e2e8f0",fontWeight:600,flex:1}}>{t.name}</span>
+                  <span style={{fontSize:11,color:"#fbbf24",fontWeight:700}}>🔥 {s} Tage</span>
+                </div>
+              ))}
+            </div>}
+            <div style={{fontSize:12,color:"#334155",marginBottom:18}}>Freeze einsetzen um alle Streaks zu erhalten?</div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={doBreakStreak} style={{flex:1,padding:"11px",borderRadius:11,border:"1px solid #1e293b",background:"transparent",color:"#475569",fontFamily:"'Rajdhani',sans-serif",fontWeight:700,fontSize:13}}>Verlieren</button>
+              <button onClick={doFreeze} style={{flex:1,padding:"11px",borderRadius:11,border:"none",background:"linear-gradient(135deg,#1d4ed8,#38bdf8)",color:"#fff",fontFamily:"'Orbitron',monospace",fontWeight:700,fontSize:11,letterSpacing:1}}>❄️ FREEZE ({plr.freezes})</button>
+            </div>
           </div>
         </div>
-      </div>}
+        );
+      })()}
 
       {/* HEADER */}
       <div style={{position:"sticky",top:0,zIndex:100,background:"rgba(6,6,18,.97)",backdropFilter:"blur(20px)",borderBottom:"1px solid rgba(56,189,248,.12)",padding:"16px 18px 0",paddingTop:"max(16px,calc(env(safe-area-inset-top,0px) + 16px))"}}>
@@ -1330,7 +1379,7 @@ export default function App() {
             <div style={{marginBottom:newQ.frequency==="daily"?10:16}}>
               <div style={{fontSize:10,color:"#3a4f6a",letterSpacing:1,marginBottom:8,fontWeight:700}}>HÄUFIGKEIT</div>
               <div style={{display:"flex",gap:8}}>
-                {[{k:"daily",l:"🔄",sub:"TÄGLICH",c:"#38bdf8"},{k:"once",l:"✅",sub:"EINMALIG",c:"#fb923c"}].map(({k,l,sub,c})=>(
+                {[{k:"daily",l:"🔄",sub:"TÄGLICH",c:"#38bdf8"},{k:"once",l:"✅",sub:"EINMALIG",c:"#fb923c"},{k:"boss",l:"⚠️",sub:"BOSS",c:"#f87171"}].map(({k,l,sub,c})=>(
                   <button key={k} onClick={()=>setNewQ(q=>({...q,frequency:k,repeatable:k==="daily"?q.repeatable:false}))} style={{flex:1,padding:"12px 4px",borderRadius:11,border:`1px solid ${newQ.frequency===k?c:"#1e2f48"}`,background:newQ.frequency===k?c+"16":"transparent",color:newQ.frequency===k?c:"#3a4f6a",fontFamily:"'Rajdhani',sans-serif",fontWeight:700}}>
                     <div style={{fontSize:18}}>{l}</div><div style={{fontSize:10,marginTop:2}}>{sub}</div>
                   </button>
