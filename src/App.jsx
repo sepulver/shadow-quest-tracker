@@ -151,6 +151,23 @@ const QUOTES = [
   { text: "You don't rise to the level of your goals. You fall to the level of your systems.", source: "James Clear · Atomic Habits" },
 ];
 
+const SEASONS = [
+  { id:"shadow_month",    name:"Shadow Month",     emoji:"🌑", months:[10],   days:null,  xpMult:1.5,  color:"#c084fc", desc:"Oktober: +50% XP auf alle Quests" },
+  { id:"new_year_sprint", name:"New Year Sprint",  emoji:"🎯", months:[1],    days:[1,7], xpMult:1.3,  color:"#38bdf8", desc:"Erste Januarwoche: +30% XP" },
+  { id:"summer_grind",    name:"Summer Grind",     emoji:"☀️", months:[7],    days:null,  xpMult:1.2,  color:"#fbbf24", desc:"Juli: +20% XP auf alle Quests" },
+  { id:"winter_warrior",  name:"Winter Warrior",   emoji:"❄️", months:[12],   days:null,  xpMult:1.2,  color:"#7dd3fc", desc:"Dezember: +20% XP auf alle Quests" },
+  { id:"spring_awakening",name:"Spring Awakening", emoji:"🌸", months:[3,4],  days:null,  xpMult:1.15, color:"#f9a8d4", desc:"Frühling: +15% XP" },
+];
+function getActiveSeason(dateStr){
+  const d=new Date(dateStr+"T12:00");
+  const m=d.getMonth()+1, day=d.getDate();
+  return SEASONS.find(s=>{
+    if(!s.months.includes(m))return false;
+    if(s.days){return day>=s.days[0]&&day<=s.days[1];}
+    return true;
+  })||null;
+}
+
 function getDailyQuote(dateStr) {
   let h = 0;
   for (let i = 0; i < dateStr.length; i++) h = (h * 31 + dateStr.charCodeAt(i)) >>> 0;
@@ -225,6 +242,22 @@ function questStreak(comps, templateId, today, template) {
     if(streak>365) break;
   }
   return streak;
+}
+function diffStreakMult(streak, difficulty){
+  if(difficulty==="hard"){
+    if(streak>=30)return 1.5;
+    if(streak>=14)return 1.2;
+    if(streak>=7) return 1.1;
+  } else if(difficulty==="normal"){
+    if(streak>=30)return 1.3;
+    if(streak>=14)return 1.15;
+    if(streak>=7) return 1.1;
+  } else {
+    if(streak>=30)return 1.2;
+    if(streak>=14)return 1.1;
+    if(streak>=7) return 1.05;
+  }
+  return 1;
 }
 function computeStats(comps, player, level) {
   const cat={};
